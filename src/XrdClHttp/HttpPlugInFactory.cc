@@ -22,7 +22,7 @@ HttpPlugInFactory::~HttpPlugInFactory() {
 }
 
 XrdCl::FilePlugIn* HttpPlugInFactory::CreateFile( const std::string &/*url*/ ) {
-  return new HttpFilePlugIn();
+  return new XrdCl::HttpFilePlugIn();
 }
 
 XrdCl::FileSystemPlugIn* HttpPlugInFactory::CreateFileSystem( const std::string &/*url*/ ) { return nullptr; }
