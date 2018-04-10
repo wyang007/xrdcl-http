@@ -1,6 +1,11 @@
-set(lib${PROJECT_NAME_LOWER}_sources
-    XrdClHttp/XrdClHttp.cc)
+set(lib${PROJECT_NAME}_sources
+  XrdClHttp/HttpPlugInFactory.cc
+  XrdClHttp/HttpFilePlugIn.cc)
 
-add_library(${PROJECT_NAME_LOWER} MODULE ${lib${PROJECT_NAME_LOWER}_sources})
+set(PLUGIN_NAME "${PROJECT_NAME}-${PLUGIN_VERSION}")
 
-target_link_libraries(${PROJECT_NAME_LOWER} ${Davix_LIBRARIES} ${XrdCl_LIBRARIES})
+add_library(${PLUGIN_NAME} MODULE ${lib${PROJECT_NAME}_sources})
+
+target_link_libraries(${PLUGIN_NAME} ${Davix_LIBRARIES} ${XrdCl_LIBRARIES})
+
+install(TARGETS ${PLUGIN_NAME} LIBRARY DESTINATION lib)
