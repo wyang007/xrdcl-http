@@ -16,7 +16,7 @@ option(BUILD_TESTS "Enable unit tests" OFF)
 
 # Dependencies
 find_package(Davix REQUIRED)
-include_directories(${Davix_INCLUDE_DIRS})
+include_directories(${Davix_INCLUDE_DIRS}/davix)
 
 find_package(XrdCl REQUIRED)
 include_directories(${XrdCl_INCLUDE_DIRS}/xrootd)

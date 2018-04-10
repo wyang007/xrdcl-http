@@ -5,14 +5,18 @@
 #ifndef __HTTP_FILE_PLUG_IN_
 #define __HTTP_FILE_PLUG_IN_
 
-#include <limits>
 #include <cstdint>
+
+#include <limits>
+#include <unordered_map>
 
 #include "XrdCl/XrdClDefaultEnv.hh"
 #include "XrdCl/XrdClFile.hh"
 #include "XrdCl/XrdClFileSystem.hh"
 #include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClPlugInInterface.hh"
+
+#include "davix.hpp"
 
 namespace XrdCl {
 
@@ -114,9 +118,18 @@ class HttpFilePlugIn : public FilePlugIn {
 
  private:
   // Topic id for the logger
-  static const uint64_t LogXrdClHttp = std::numeric_limits<std::uint64_t>::max();
+  static const uint64_t kLogXrdClHttp = std::numeric_limits<std::uint64_t>::max();
 
-  Log* pLogger;
+  Davix::Context davix_context_;
+  Davix::DavPosix davix_client_;
+
+  DAVIX_FD* davix_fd_;
+
+  bool is_open_;
+
+  std::unordered_map<std::string, std::string> properties_;
+
+  Log* logger_;
 };
 
 }
