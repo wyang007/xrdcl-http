@@ -117,6 +117,7 @@ class HttpFilePlugIn : public FilePlugIn {
                             std::string &value ) const override;
 
  private:
+
   // Topic id for the logger
   static const uint64_t kLogXrdClHttp = std::numeric_limits<std::uint64_t>::max();
 

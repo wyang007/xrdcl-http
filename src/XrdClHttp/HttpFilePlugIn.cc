@@ -57,6 +57,7 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
   if (!davix_fd_) {
     logger_->Error(kLogXrdClHttp, "Could not open: %s, error: %s",
                    url.c_str(), err->getErrMsg().c_str());
+    delete err;
     return XRootDStatus(stError, errUnknown);
   }
 
@@ -75,8 +76,7 @@ XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
                                     uint16_t         /*timeout*/ )
 {
   if (! is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: Cannot close. URL hasn't been previously opened",
-                   url_.c_str());
+    logger_->Error(kLogXrdClHttp, "Error: Cannot close. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -85,6 +85,7 @@ XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
   if (davix_client_.close(davix_fd_, &err)) {
     logger_->Error(kLogXrdClHttp, "Could not close davix fd: %ld, error: %s",
                    davix_fd_, err->getErrMsg().c_str());
+    delete err;
     return XRootDStatus(stError, errUnknown);
   }
 
@@ -104,8 +105,7 @@ XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
                                    uint16_t         timeout )
 {
   if (! is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: Cannot stat. URL hasn't been previously opened",
-                   url_.c_str());
+    logger_->Error(kLogXrdClHttp, "Error: Cannot stat. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -120,6 +120,7 @@ XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
   if (davix_client_.stat(&params, url_, &stats, &err)) {
     logger_->Error(kLogXrdClHttp, "Could not stat URL: %s, error: %s",
                    url_.c_str(), err->getErrMsg().c_str());
+    delete err;
     return XRootDStatus(stError, errUnknown);
   }
 
@@ -149,13 +150,32 @@ XRootDStatus HttpFilePlugIn::Read( uint64_t         offset,
                                    uint32_t         size,
                                    void            *buffer,
                                    ResponseHandler *handler,
-                                   uint16_t         timeout )
+                                   uint16_t         /*timeout*/ )
 {
-  (void)offset; (void)size; (void)buffer; (void)handler; (void)timeout;
+  if (! is_open_) {
+    logger_->Error(kLogXrdClHttp, "Error: Cannot read. URL hasn't previously been opened");
+    return XRootDStatus(stError, errInvalidOp);
+  }
 
-  logger_->Debug(kLogXrdClHttp, "Read not implemented.");
+  Davix::DavixError* err = nullptr;
+  int num_bytes_read = davix_client_.pread(davix_fd_, buffer, size, offset, &err);
+  if (num_bytes_read < 0) {
+    logger_->Error(kLogXrdClHttp, "Could not read URL: %s, error: %s",
+                   url_.c_str(), err->getErrMsg().c_str());
+    delete err;
+    return XRootDStatus(stError, errUnknown);
+  }
 
-  return XRootDStatus( stError, errNotImplemented );
+  logger_->Debug(kLogXrdClHttp, "Read %d bytes, at offset %d, from URL: %s",
+                 num_bytes_read, offset, url_.c_str());
+
+  auto status = new XRootDStatus();
+  auto chunk_info = new ChunkInfo(offset, num_bytes_read, buffer);
+  auto obj = new AnyObject();
+  obj->Set(chunk_info);
+  handler->HandleResponse(status, obj);
+
+  return XRootDStatus();
 }
 
 XRootDStatus HttpFilePlugIn::Write( uint64_t         offset,
