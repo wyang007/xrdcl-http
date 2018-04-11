@@ -127,6 +127,8 @@ class HttpFilePlugIn : public FilePlugIn {
 
   bool is_open_;
 
+  std::string url_;
+
   std::unordered_map<std::string, std::string> properties_;
 
   Log* logger_;

@@ -19,6 +19,7 @@ HttpFilePlugIn::HttpFilePlugIn()
       davix_client_(&davix_context_),
       davix_fd_(nullptr),
       is_open_(false),
+      url_(),
       properties_(),
       logger_(DefaultEnv::GetLog())
 {
@@ -40,6 +41,11 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
                                    ResponseHandler   *handler,
                                    uint16_t           timeout )
 {
+  if (is_open_) {
+    logger_->Error(kLogXrdClHttp, "Error: URL %s already open", url.c_str());
+    return XRootDStatus(stError, errInvalidOp);
+  }
+
   Davix::RequestParams params;
   if (timeout != 0) {
     struct timespec ts = {timeout, 0};
@@ -49,7 +55,7 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
   Davix::DavixError* err = nullptr;
   davix_fd_ = davix_client_.open(&params, url, flags, &err);
   if (!davix_fd_) {
-    logger_->Debug(kLogXrdClHttp, "Could not open: %s, error: %s",
+    logger_->Error(kLogXrdClHttp, "Could not open: %s, error: %s",
                    url.c_str(), err->getErrMsg().c_str());
     return XRootDStatus(stError, errUnknown);
   }
@@ -57,8 +63,9 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
   logger_->Debug(kLogXrdClHttp, "Opened: %s", url.c_str());
 
   is_open_ = true;
+  url_ = url;
 
-  XRootDStatus* status = new XRootDStatus();
+  auto status = new XRootDStatus();
   handler->HandleResponse(status, nullptr);
 
   return XRootDStatus();
@@ -67,10 +74,16 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
 XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
                                     uint16_t         /*timeout*/ )
 {
+  if (! is_open_) {
+    logger_->Error(kLogXrdClHttp, "Error: Cannot close. URL hasn't been previously opened",
+                   url_.c_str());
+    return XRootDStatus(stError, errInvalidOp);
+  }
+
   Davix::DavixError* err = nullptr;
 
   if (davix_client_.close(davix_fd_, &err)) {
-    logger_->Debug(kLogXrdClHttp, "Could not close davix fd: %ld, error: %s",
+    logger_->Error(kLogXrdClHttp, "Could not close davix fd: %ld, error: %s",
                    davix_fd_, err->getErrMsg().c_str());
     return XRootDStatus(stError, errUnknown);
   }
@@ -78,22 +91,58 @@ XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
   logger_->Debug(kLogXrdClHttp, "Closed davix fd: %ld", davix_fd_);
 
   is_open_ = false;
+  url_.clear();
 
-  XRootDStatus* status = new XRootDStatus();
+  auto status = new XRootDStatus();
   handler->HandleResponse(status, nullptr);
 
   return XRootDStatus();
 }
 
-XRootDStatus HttpFilePlugIn::Stat( bool             force,
+XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
                                    ResponseHandler *handler,
                                    uint16_t         timeout )
 {
-  (void)force; (void)handler; (void)timeout;
+  if (! is_open_) {
+    logger_->Error(kLogXrdClHttp, "Error: Cannot stat. URL hasn't been previously opened",
+                   url_.c_str());
+    return XRootDStatus(stError, errInvalidOp);
+  }
 
-  logger_->Debug(kLogXrdClHttp, "Stat not implemented.");
+  Davix::RequestParams params;
+  if (timeout != 0) {
+    struct timespec ts = {timeout, 0};
+    params.setOperationTimeout(&ts);
+  }
 
-  return XRootDStatus( stError, errNotImplemented );
+  struct stat stats;
+  Davix::DavixError* err = nullptr;
+  if (davix_client_.stat(&params, url_, &stats, &err)) {
+    logger_->Error(kLogXrdClHttp, "Could not stat URL: %s, error: %s",
+                   url_.c_str(), err->getErrMsg().c_str());
+    return XRootDStatus(stError, errUnknown);
+  }
+
+  logger_->Debug(kLogXrdClHttp, "Stat-ed URL: %s", url_.c_str());
+
+  std::ostringstream data;
+  data << stats.st_dev << " " << stats.st_size << " "
+       << stats.st_mode << " " << stats.st_mtime;
+
+  auto stat_info = new StatInfo();
+  if (!stat_info->ParseServerResponse(data.str().c_str())) {
+    logger_->Error(kLogXrdClHttp, "Could not parse stat reply for URL: %s",
+                   url_.c_str());
+    return XRootDStatus(stError, errDataError);
+  }
+
+  auto obj = new AnyObject();
+  obj->Set(stat_info);
+
+  auto status = new XRootDStatus();
+  handler->HandleResponse( status, obj );
+
+  return XRootDStatus();
 }
 
 XRootDStatus HttpFilePlugIn::Read( uint64_t         offset,
