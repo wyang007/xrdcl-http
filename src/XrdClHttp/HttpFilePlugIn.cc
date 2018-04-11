@@ -76,7 +76,8 @@ XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
                                     uint16_t         /*timeout*/ )
 {
   if (! is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: Cannot close. URL hasn't been previously opened");
+    logger_->Error(kLogXrdClHttp,
+                   "Error: Cannot close. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -105,7 +106,8 @@ XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
                                    uint16_t         timeout )
 {
   if (! is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: Cannot stat. URL hasn't been previously opened");
+    logger_->Error(kLogXrdClHttp,
+                   "Error: Cannot stat. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -153,7 +155,8 @@ XRootDStatus HttpFilePlugIn::Read( uint64_t         offset,
                                    uint16_t         /*timeout*/ )
 {
   if (! is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: Cannot read. URL hasn't previously been opened");
+    logger_->Error(kLogXrdClHttp,
+                   "Error: Cannot read. URL hasn't previously been opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -215,13 +218,54 @@ XRootDStatus HttpFilePlugIn::Truncate( uint64_t         size,
 XRootDStatus HttpFilePlugIn::VectorRead( const ChunkList &chunks,
                                          void            *buffer,
                                          ResponseHandler *handler,
-                                         uint16_t         timeout )
+                                         uint16_t         /*timeout*/ )
 {
-  (void)chunks; (void)buffer; (void)handler; (void)timeout;
+  if (! is_open_) {
+    logger_->Error(kLogXrdClHttp,
+                   "Error: Cannot read. URL hasn't previously been opened");
+    return XRootDStatus(stError, errInvalidOp);
+  }
 
-  logger_->Debug(kLogXrdClHttp, "VectorRead not implemented.");
+  const auto num_chunks = chunks.size();
+  std::vector<Davix::DavIOVecInput> input_vector(num_chunks);
+  std::vector<Davix::DavIOVecOuput> output_vector(num_chunks);
 
-  return XRootDStatus( stError, errNotImplemented );
+  for (size_t i = 0; i < num_chunks; ++i) {
+    input_vector[i].diov_offset = chunks[i].offset;
+    input_vector[i].diov_size = chunks[i].length;
+    input_vector[i].diov_buffer = chunks[i].buffer;
+  }
+
+  Davix::DavixError* err = nullptr;
+  int num_bytes_read = davix_client_.preadVec(davix_fd_, input_vector.data(),
+                                              output_vector.data(), num_chunks,
+                                              &err);
+  if (num_bytes_read < 0) {
+    logger_->Error(kLogXrdClHttp, "Could not vectorRead URL: %s, error: %s",
+                   url_.c_str(), err->getErrMsg().c_str());
+    delete err;
+    return XRootDStatus(stError, errUnknown);
+  }
+
+  logger_->Debug(kLogXrdClHttp, "VecRead %d bytes, from URL: %s",
+                 num_bytes_read, url_.c_str());
+
+  char* output = static_cast<char*>(buffer);
+  for (size_t i = 0; i < num_chunks; ++i) {
+    std::memcpy(output + input_vector[i].diov_offset,
+                output_vector[i].diov_buffer,
+                output_vector[i].diov_size);
+  }
+
+  auto status = new XRootDStatus();
+  auto read_info = new VectorReadInfo();
+  read_info->SetSize(num_bytes_read);
+  read_info->GetChunks() = chunks;
+  auto obj = new AnyObject();
+  obj->Set(read_info);
+  handler->HandleResponse(status, obj);
+
+  return XRootDStatus();
 }
 
 XRootDStatus HttpFilePlugIn::Fcntl( const Buffer    &arg,
