@@ -10,20 +10,20 @@
 #include <limits>
 #include <unordered_map>
 
-#include "XrdCl/XrdClDefaultEnv.hh"
 #include "XrdCl/XrdClFile.hh"
 #include "XrdCl/XrdClFileSystem.hh"
-#include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClPlugInInterface.hh"
 
 #include "davix.hpp"
 
 namespace XrdCl {
 
+class Log;
+
 class HttpFilePlugIn : public FilePlugIn {
  public:
   HttpFilePlugIn();
-  virtual ~HttpFilePlugIn();
+  virtual ~HttpFilePlugIn() = default;
 
   //------------------------------------------------------------------------
   //! @see XrdCl::File::Open
@@ -117,9 +117,6 @@ class HttpFilePlugIn : public FilePlugIn {
                             std::string &value ) const override;
 
  private:
-
-  // Topic id for the logger
-  static const uint64_t kLogXrdClHttp = std::numeric_limits<std::uint64_t>::max();
 
   Davix::Context davix_context_;
   Davix::DavPosix davix_client_;

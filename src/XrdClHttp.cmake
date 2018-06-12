@@ -1,6 +1,8 @@
 set(lib${PROJECT_NAME}_sources
   XrdClHttp/HttpPlugInFactory.cc
-  XrdClHttp/HttpFilePlugIn.cc)
+  XrdClHttp/HttpPlugInUtil.cc
+  XrdClHttp/HttpFilePlugIn.cc
+  XrdClHttp/HttpFileSystemPlugIn.cc)
 
 set(PLUGIN_NAME "${PROJECT_NAME}-${PLUGIN_VERSION}")
 

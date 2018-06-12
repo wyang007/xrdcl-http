@@ -6,11 +6,11 @@
 
 #include <cassert>
 
-#include <mutex>
-
+#include "XrdCl/XrdClDefaultEnv.hh"
+#include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClStatus.hh"
+#include "HttpPlugInUtil.hh"
 
-static std::once_flag logging_topic_init;
 
 namespace XrdCl {
 
@@ -23,17 +23,9 @@ HttpFilePlugIn::HttpFilePlugIn()
       properties_(),
       logger_(DefaultEnv::GetLog())
 {
-  // Assert that there is no existing topic
-  std::call_once(logging_topic_init, [this] {
-      if (logger_) {
-        logger_->SetTopicName(kLogXrdClHttp, "XrdClHttp");
-      }
-    });
-
+  SetUpLogging(logger_);
   logger_->Debug(kLogXrdClHttp, "HttpFilePlugin constructed.");
 }
-
-HttpFilePlugIn::~HttpFilePlugIn() {}
 
 XRootDStatus HttpFilePlugIn::Open( const std::string &url,
                                    OpenFlags::Flags   flags,
