@@ -6,37 +6,47 @@
 
 #include <mutex>
 
-#include "HttpFilePlugIn.hh"
-#include "HttpPlugInUtil.hh"
 #include "XrdCl/XrdClDefaultEnv.hh"
 #include "XrdCl/XrdClLog.hh"
-#include "xrootd/XrdCl/XrdClXRootDResponses.hh"
+#include "XrdCl/XrdClXRootDResponses.hh"
+
+#include "davix.hpp"
+
+#include "HttpFilePlugIn.hh"
+#include "HttpPlugInUtil.hh"
+#include "HttpStat.hh"
 
 namespace XrdCl {
 
-HttpFileSystemPlugIn::HttpFileSystemPlugIn() : logger_(DefaultEnv::GetLog()) {
+HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
+    : url_(url), logger_(DefaultEnv::GetLog()) {
   SetUpLogging(logger_);
-  logger_->Debug(kLogXrdClHttp, "HttpFileSystemPlugIn constructed.");
+  logger_->Debug(kLogXrdClHttp,
+                 "HttpFileSystemPlugIn constructed with URL: %s.",
+                 url_.GetURL().c_str());
 }
 
-XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,
+XRootDStatus HttpFileSystemPlugIn::Stat(const std::string& path,
                                         ResponseHandler *handler,
                                         uint16_t timeout) {
-  logger_->Debug(kLogXrdClHttp, "HttpFileSystemPlugIn::Stat - path = %s, timeout = %d",
+  logger_->Debug(kLogXrdClHttp,
+                 "HttpFileSystemPlugIn::Stat - path = %s, timeout = %d",
                  path.c_str(), timeout);
-  File file(true);
-  auto status1 = file.Open(path, OpenFlags::Read, Access::UR, timeout);
+
+  Davix::Context ctx;
+  Davix::DavPosix davix_client(&ctx);
 
   auto stat_info = new StatInfo();
-  file.Stat(false, stat_info, timeout);
+  auto status = HttpStat(davix_client, url_.GetLocation(), timeout, stat_info);
 
-  ResponseHandler close_handler;
-  file.Close(&close_handler, timeout);
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr());
+  }
 
   auto obj = new AnyObject();
   obj->Set(stat_info);
-  auto status2 = new XRootDStatus();
-  handler->HandleResponse(status2, obj);
+
+  handler->HandleResponse(new XRootDStatus(), obj);
 
   return XRootDStatus();
 }

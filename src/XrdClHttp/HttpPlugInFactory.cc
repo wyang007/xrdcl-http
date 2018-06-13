@@ -26,6 +26,6 @@ XrdCl::FilePlugIn* HttpPlugInFactory::CreateFile( const std::string &/*url*/ ) {
   return new XrdCl::HttpFilePlugIn();
 }
 
-XrdCl::FileSystemPlugIn* HttpPlugInFactory::CreateFileSystem( const std::string &/*url*/ ) {
-  return new XrdCl::HttpFileSystemPlugIn();
+XrdCl::FileSystemPlugIn* HttpPlugInFactory::CreateFileSystem( const std::string& url ) {
+  return new XrdCl::HttpFileSystemPlugIn(url);
 }

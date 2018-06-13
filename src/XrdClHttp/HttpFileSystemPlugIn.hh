@@ -7,12 +7,14 @@
 
 #include "XrdCl/XrdClPlugInInterface.hh"
 
+#include "XrdCl/XrdClURL.hh"
+
 namespace XrdCl {
   class Log;
 
   class HttpFileSystemPlugIn : public FileSystemPlugIn {
     public:
-      HttpFileSystemPlugIn();
+      HttpFileSystemPlugIn(const std::string& url);
       virtual ~HttpFileSystemPlugIn() = default;
 
       virtual XRootDStatus Stat(const std::string &path,
@@ -20,7 +22,8 @@ namespace XrdCl {
                                 uint16_t timeout) override;
 
     private:
-        Log* logger_;
+      URL url_;
+      Log* logger_;
   };
 }
 
