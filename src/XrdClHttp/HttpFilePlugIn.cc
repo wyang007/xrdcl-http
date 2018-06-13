@@ -10,6 +10,7 @@
 #include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClStatus.hh"
 #include "HttpPlugInUtil.hh"
+#include "HttpStat.hh"
 
 
 namespace XrdCl {
@@ -34,7 +35,7 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
                                    uint16_t           timeout )
 {
   if (is_open_) {
-    logger_->Error(kLogXrdClHttp, "Error: URL %s already open", url.c_str());
+    logger_->Error(kLogXrdClHttp, "URL %s already open", url.c_str());
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -69,7 +70,7 @@ XRootDStatus HttpFilePlugIn::Close( ResponseHandler *handler,
 {
   if (! is_open_) {
     logger_->Error(kLogXrdClHttp,
-                   "Error: Cannot close. URL hasn't been previously opened");
+                   "Cannot close. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -99,43 +100,23 @@ XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
 {
   if (! is_open_) {
     logger_->Error(kLogXrdClHttp,
-                   "Error: Cannot stat. URL hasn't been previously opened");
+                   "Cannot stat. URL hasn't been previously opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  Davix::RequestParams params;
-  if (timeout != 0) {
-    struct timespec ts = {timeout, 0};
-    params.setOperationTimeout(&ts);
-  }
-
-  struct stat stats;
-  Davix::DavixError* err = nullptr;
-  if (davix_client_.stat(&params, url_, &stats, &err)) {
-    logger_->Error(kLogXrdClHttp, "Could not stat URL: %s, error: %s",
-                   url_.c_str(), err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+  auto stat_info = new StatInfo();
+  auto status = HttpStat(davix_client_, url_, timeout, stat_info);
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr());
+    return status;
   }
 
   logger_->Debug(kLogXrdClHttp, "Stat-ed URL: %s", url_.c_str());
 
-  std::ostringstream data;
-  data << stats.st_dev << " " << stats.st_size << " "
-       << stats.st_mode << " " << stats.st_mtime;
-
-  auto stat_info = new StatInfo();
-  if (!stat_info->ParseServerResponse(data.str().c_str())) {
-    logger_->Error(kLogXrdClHttp, "Could not parse stat reply for URL: %s",
-                   url_.c_str());
-    return XRootDStatus(stError, errDataError);
-  }
-
   auto obj = new AnyObject();
   obj->Set(stat_info);
 
-  auto status = new XRootDStatus();
-  handler->HandleResponse( status, obj );
+  handler->HandleResponse(new XRootDStatus(), obj);
 
   return XRootDStatus();
 }
@@ -148,7 +129,7 @@ XRootDStatus HttpFilePlugIn::Read( uint64_t         offset,
 {
   if (! is_open_) {
     logger_->Error(kLogXrdClHttp,
-                   "Error: Cannot read. URL hasn't previously been opened");
+                   "Cannot read. URL hasn't previously been opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
@@ -214,7 +195,7 @@ XRootDStatus HttpFilePlugIn::VectorRead( const ChunkList &chunks,
 {
   if (! is_open_) {
     logger_->Error(kLogXrdClHttp,
-                   "Error: Cannot read. URL hasn't previously been opened");
+                   "Cannot read. URL hasn't previously been opened");
     return XRootDStatus(stError, errInvalidOp);
   }
 
