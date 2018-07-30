@@ -15,7 +15,7 @@ namespace XrdCl {
   class HttpFileSystemPlugIn : public FileSystemPlugIn {
     public:
       HttpFileSystemPlugIn(const std::string& url);
-      virtual ~HttpFileSystemPlugIn() = default;
+      virtual ~HttpFileSystemPlugIn() noexcept = default;
 
       virtual XRootDStatus Stat(const std::string &path,
                                 ResponseHandler *handler,

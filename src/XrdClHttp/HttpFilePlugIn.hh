@@ -23,7 +23,7 @@ class Log;
 class HttpFilePlugIn : public FilePlugIn {
  public:
   HttpFilePlugIn();
-  virtual ~HttpFilePlugIn() = default;
+  virtual ~HttpFilePlugIn() noexcept = default;
 
   //------------------------------------------------------------------------
   //! @see XrdCl::File::Open
