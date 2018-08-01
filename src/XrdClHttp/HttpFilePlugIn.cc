@@ -13,6 +13,41 @@
 #include "HttpStat.hh"
 
 
+namespace {
+
+int XRootDOpenFlagsToPosix(XrdCl::Log* logger, XrdCl::OpenFlags::Flags flags) {
+  using XrdCl::OpenFlags;
+  int posix_flags = 0;
+  if (flags & OpenFlags::New) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::New -> O_CREAT | O_EXCL");
+    posix_flags |= O_CREAT | O_EXCL;
+  }
+  if (flags & OpenFlags::Delete) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Delete -> O_CREAT | O_TRUNC");
+    posix_flags |= O_CREAT | O_TRUNC;
+  }
+  if (flags & OpenFlags::Append) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Append -> O_APPEND");
+    posix_flags |= O_APPEND;
+  }
+  if (flags & OpenFlags::Read) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Read -> O_RDONLY");
+    posix_flags |= O_RDONLY;
+  }
+  if (flags & OpenFlags::Write) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Write -> O_WRONLY");
+    posix_flags |= O_WRONLY;
+  }
+  if (flags & OpenFlags::Update) {
+    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Update -> O_RDWR");
+    posix_flags |= O_RDWR;
+  }
+  return posix_flags;
+}
+
+}
+
+
 namespace XrdCl {
 
 HttpFilePlugIn::HttpFilePlugIn()
@@ -45,8 +80,11 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
     params.setOperationTimeout(&ts);
   }
 
+  logger_->Debug(kLogXrdClHttp, "HttpFilePlugIn::Open: URL: %s, flags: %d", url.c_str(), flags);
+
+  auto posix_open_flags = XRootDOpenFlagsToPosix(logger_, flags);
   Davix::DavixError* err = nullptr;
-  davix_fd_ = davix_client_.open(&params, url, flags, &err);
+  davix_fd_ = davix_client_.open(&params, url, posix_open_flags, &err);
   if (!davix_fd_) {
     logger_->Error(kLogXrdClHttp, "Could not open: %s, error: %s",
                    url.c_str(), err->getErrMsg().c_str());
@@ -160,11 +198,36 @@ XRootDStatus HttpFilePlugIn::Write( uint64_t         offset,
                                     ResponseHandler *handler,
                                     uint16_t         timeout )
 {
-  (void)offset; (void)size; (void)buffer; (void)handler; (void)timeout;
+  if (! is_open_) {
+    logger_->Error(kLogXrdClHttp,
+                   "Cannot write. URL hasn't previously been opened");
+    return XRootDStatus(stError, errInvalidOp);
+  }
 
-  logger_->Debug(kLogXrdClHttp, "Write not implemented.");
+  Davix::DavixError* err = nullptr;
+  int new_offset = davix_client_.lseek64(davix_fd_, offset, 0, &err);
+  if (new_offset != offset) {
+    logger_->Error(kLogXrdClHttp, "Could not seek to offset %ld, error: %s",
+                   offset, err->getErrMsg().c_str());
+    delete err;
+    return XRootDStatus(stError, errUnknown);
+  }
+  int num_bytes_written = davix_client_.write(davix_fd_, buffer, size, &err);
+  if (num_bytes_written < 0) {
+    logger_->Error(kLogXrdClHttp, "Could not write URL: %s, error: %s",
+                   url_.c_str(), err->getErrMsg().c_str());
+    delete err;
+    return XRootDStatus(stError, errUnknown);
+  }
 
-  return XRootDStatus( stError, errNotImplemented );
+  logger_->Debug(kLogXrdClHttp, "Wrote %d bytes, at offset %d, to URL: %s",
+                 num_bytes_written, offset, url_.c_str());
+
+
+  auto status = new XRootDStatus();
+  handler->HandleResponse(status, nullptr);
+
+  return XRootDStatus();
 }
 
 XRootDStatus HttpFilePlugIn::Sync( ResponseHandler *handler,
