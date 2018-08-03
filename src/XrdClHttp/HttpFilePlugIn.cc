@@ -245,9 +245,9 @@ XRootDStatus HttpFilePlugIn::Sync( ResponseHandler *handler,
 {
   (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Sync not implemented.");
+  logger_->Debug(kLogXrdClHttp, "Sync is a no-op for HTTP.");
 
-  return XRootDStatus( stError, errNotImplemented );
+  return XRootDStatus();
 }
 
 XRootDStatus HttpFilePlugIn::Truncate( uint64_t         size,
@@ -256,9 +256,9 @@ XRootDStatus HttpFilePlugIn::Truncate( uint64_t         size,
 {
   (void)size; (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Truncate not implemented.");
+  logger_->Debug(kLogXrdClHttp, "Truncate not supported with HTTP.");
 
-  return XRootDStatus( stError, errNotImplemented );
+  return XRootDStatus( stError, errNotSupported );
 }
 
 XRootDStatus HttpFilePlugIn::VectorRead( const ChunkList &chunks,
@@ -320,9 +320,9 @@ XRootDStatus HttpFilePlugIn::Fcntl( const Buffer    &arg,
 {
   (void)arg; (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Fcntl not implemented.");
+  logger_->Debug(kLogXrdClHttp, "Fcntl not supported with HTTP.");
 
-  return XRootDStatus( stError, errNotImplemented );
+  return XRootDStatus( stError, errNotSupported );
 }
 
 XRootDStatus HttpFilePlugIn::Visa( ResponseHandler *handler,
@@ -330,9 +330,9 @@ XRootDStatus HttpFilePlugIn::Visa( ResponseHandler *handler,
 {
   (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Visa not implemented.");
+  logger_->Debug(kLogXrdClHttp, "Visa not supported with HTTP.");
 
-  return XRootDStatus( stError, errNotImplemented );
+  return XRootDStatus( stError, errNotSupported );
 }
 
 bool HttpFilePlugIn::IsOpen() const
