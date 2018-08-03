@@ -2,7 +2,7 @@
  * This file is part of XrdClHttp
  */
 
-#include "HttpStat.hh"
+#include "Posix.hh"
 
 #include "XrdCl/XrdClStatus.hh"
 
@@ -10,7 +10,9 @@
 
 namespace XrdCl {
 
-XRootDStatus HttpStat(Davix::DavPosix& davix_client, const std::string& url,
+namespace Posix {
+
+XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
                       uint16_t timeout, StatInfo* stat_info) {
   Davix::RequestParams params;
   if (timeout != 0) {
@@ -35,5 +37,7 @@ XRootDStatus HttpStat(Davix::DavPosix& davix_client, const std::string& url,
 
   return XRootDStatus();
 }
+
+}  // namespace Posix
 
 }  // namespace XrdCl

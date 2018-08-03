@@ -14,7 +14,7 @@
 
 #include "HttpFilePlugIn.hh"
 #include "HttpPlugInUtil.hh"
-#include "HttpStat.hh"
+#include "Posix.hh"
 
 namespace XrdCl {
 
@@ -37,10 +37,10 @@ XRootDStatus HttpFileSystemPlugIn::Stat(const std::string& path,
   Davix::DavPosix davix_client(&ctx);
 
   auto stat_info = new StatInfo();
-  auto status = HttpStat(davix_client, url_.GetLocation(), timeout, stat_info);
+  auto status = Posix::Stat(davix_client, url_.GetLocation(), timeout, stat_info);
 
   if (status.IsError()) {
-    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr());
+    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());
   }
 
   auto obj = new AnyObject();

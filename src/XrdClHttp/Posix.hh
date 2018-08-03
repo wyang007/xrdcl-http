@@ -19,8 +19,12 @@ namespace XrdCl {
 
 class StatInfo;
 
-XRootDStatus HttpStat(Davix::DavPosix& davix_client, const std::string& url,
-                      uint16_t timeout, StatInfo* stat_info);
+namespace Posix {
+
+XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
+                  uint16_t timeout, StatInfo* stat_info);
+
+}  // namespace Posix
 
 }  // namespace XrdCl
 

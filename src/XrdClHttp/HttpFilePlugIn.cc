@@ -10,36 +10,29 @@
 #include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClStatus.hh"
 #include "HttpPlugInUtil.hh"
-#include "HttpStat.hh"
+#include "Posix.hh"
 
 
 namespace {
 
-int XRootDOpenFlagsToPosix(XrdCl::Log* logger, XrdCl::OpenFlags::Flags flags) {
-  using XrdCl::OpenFlags;
+int MakePosixOpenFlags(XrdCl::OpenFlags::Flags flags) {
   int posix_flags = 0;
-  if (flags & OpenFlags::New) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::New -> O_CREAT | O_EXCL");
+  if (flags & XrdCl::OpenFlags::New) {
     posix_flags |= O_CREAT | O_EXCL;
   }
-  if (flags & OpenFlags::Delete) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Delete -> O_CREAT | O_TRUNC");
+  if (flags & XrdCl::OpenFlags::Delete) {
     posix_flags |= O_CREAT | O_TRUNC;
   }
-  if (flags & OpenFlags::Append) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Append -> O_APPEND");
+  if (flags & XrdCl::OpenFlags::Append) {
     posix_flags |= O_APPEND;
   }
-  if (flags & OpenFlags::Read) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Read -> O_RDONLY");
+  if (flags & XrdCl::OpenFlags::Read) {
     posix_flags |= O_RDONLY;
   }
-  if (flags & OpenFlags::Write) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Write -> O_WRONLY");
+  if (flags & XrdCl::OpenFlags::Write) {
     posix_flags |= O_WRONLY;
   }
-  if (flags & OpenFlags::Update) {
-    logger->Debug(XrdCl::kLogXrdClHttp, "OpenFlags::Update -> O_RDWR");
+  if (flags & XrdCl::OpenFlags::Update) {
     posix_flags |= O_RDWR;
   }
   return posix_flags;
@@ -80,9 +73,26 @@ XRootDStatus HttpFilePlugIn::Open( const std::string &url,
     params.setOperationTimeout(&ts);
   }
 
-  logger_->Debug(kLogXrdClHttp, "HttpFilePlugIn::Open: URL: %s, flags: %d", url.c_str(), flags);
+  if (((flags & OpenFlags::Write) || (flags & OpenFlags::Update)) &&
+      (flags & OpenFlags::Delete)) {
+    auto stat_info = new StatInfo();
+    auto status = Posix::Stat(davix_client_, url, timeout, stat_info);
+    if (status.IsOK()) {
+      Davix::DavixError* err = nullptr;
+      if (davix_client_.unlink(&params, url, &err)) {
+        logger_->Error(kLogXrdClHttp, "Could not delete existing destination file: %s. Error: %s",
+                        url.c_str(), err->getErrMsg().c_str());
+        delete err;
+        return XRootDStatus(stError, errUnknown);
+      }
+    }
+  }
 
-  auto posix_open_flags = XRootDOpenFlagsToPosix(logger_, flags);
+  auto posix_open_flags = MakePosixOpenFlags(flags);
+
+  logger_->Debug(kLogXrdClHttp, "Open: URL: %s, XRootD flags: %d, POSIX flags: %d",
+                 url.c_str(), flags, posix_open_flags);
+
   Davix::DavixError* err = nullptr;
   davix_fd_ = davix_client_.open(&params, url, posix_open_flags, &err);
   if (!davix_fd_) {
@@ -143,9 +153,9 @@ XRootDStatus HttpFilePlugIn::Stat( bool             /*force*/,
   }
 
   auto stat_info = new StatInfo();
-  auto status = HttpStat(davix_client_, url_, timeout, stat_info);
+  auto status = Posix::Stat(davix_client_, url_, timeout, stat_info);
   if (status.IsError()) {
-    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr());
+    logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());
     return status;
   }
 
