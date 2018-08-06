@@ -256,7 +256,7 @@ XRootDStatus HttpFilePlugIn::Truncate( uint64_t         size,
 {
   (void)size; (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Truncate not supported with HTTP.");
+  logger_->Error(kLogXrdClHttp, "Truncate not supported with HTTP.");
 
   return XRootDStatus( stError, errNotSupported );
 }
@@ -320,7 +320,7 @@ XRootDStatus HttpFilePlugIn::Fcntl( const Buffer    &arg,
 {
   (void)arg; (void)handler; (void)timeout;
 
-  logger_->Debug(kLogXrdClHttp, "Fcntl not supported with HTTP.");
+  logger_->Error(kLogXrdClHttp, "Fcntl not supported with HTTP.");
 
   return XRootDStatus( stError, errNotSupported );
 }
