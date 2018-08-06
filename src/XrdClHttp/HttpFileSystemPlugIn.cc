@@ -24,6 +24,30 @@ HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
                  url_.GetURL().c_str());
 }
 
+XRootDStatus HttpFileSystemPlugIn::Mv(const std::string &source,
+                                      const std::string &dest,
+                                      ResponseHandler *handler,
+                                      uint16_t timeout) {
+  const auto full_source_path = url_.GetLocation() + source;
+  const auto full_dest_path = url_.GetLocation() + dest;
+
+  logger_->Debug(kLogXrdClHttp,
+                 "HttpFileSystemPlugIn::Mv - src = %s, dest = %s, timeout = %d",
+                 full_source_path.c_str(), full_dest_path.c_str(), timeout);
+
+  auto status =
+      Posix::Rename(davix_client_, full_source_path, full_dest_path, timeout);
+
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "Mv failed: %s", status.ToStr().c_str());
+    return status;
+  }
+
+  handler->HandleResponse(new XRootDStatus(status), nullptr);
+
+  return XRootDStatus();
+}
+
 XRootDStatus HttpFileSystemPlugIn::Truncate(const std::string &path,
                                             uint64_t size,
                                             ResponseHandler *handler,
@@ -51,6 +75,7 @@ XRootDStatus HttpFileSystemPlugIn::Rm(const std::string &path,
 
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Rm failed: %s", status.ToStr().c_str());
+    return status;
   }
 
   handler->HandleResponse(new XRootDStatus(status), nullptr);
@@ -82,11 +107,11 @@ XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,
                  full_path.c_str(), timeout);
 
   auto stat_info = new StatInfo();
-  auto status =
-      Posix::Stat(davix_client_, full_path, timeout, stat_info);
+  auto status = Posix::Stat(davix_client_, full_path, timeout, stat_info);
 
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());
+    return status;
   }
 
   auto obj = new AnyObject();

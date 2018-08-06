@@ -20,6 +20,9 @@ class HttpFileSystemPlugIn : public FileSystemPlugIn {
   HttpFileSystemPlugIn(const std::string &url);
   virtual ~HttpFileSystemPlugIn() noexcept = default;
 
+  virtual XRootDStatus Mv(const std::string &source, const std::string &dest,
+                          ResponseHandler *handler, uint16_t timeout) override;
+
   virtual XRootDStatus Truncate(const std::string &path, uint64_t size,
                                 ResponseHandler *handler,
                                 uint16_t timeout) override;

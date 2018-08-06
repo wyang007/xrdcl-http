@@ -21,6 +21,9 @@ class StatInfo;
 
 namespace Posix {
 
+XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
+                    const std::string& dest, uint16_t timeout);
+
 XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
                   uint16_t timeout, StatInfo* stat_info);
 
