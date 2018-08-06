@@ -51,4 +51,23 @@ XRootDStatus HttpFileSystemPlugIn::Stat(const std::string& path,
   return XRootDStatus();
 }
 
+bool HttpFileSystemPlugIn::SetProperty(const std::string &name,
+                                       const std::string &value)
+{
+  properties_[name] = value;
+  return true;
+}
+
+bool HttpFileSystemPlugIn::GetProperty(const std::string &name,
+                                       std::string &value) const
+{
+  const auto p = properties_.find(name);
+  if (p == std::end(properties_)) {
+    return false;
+  }
+
+  value = p->second;
+  return true;
+}
+
 }  // namespace XrdCl
