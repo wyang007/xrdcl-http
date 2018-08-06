@@ -30,6 +30,18 @@ class HttpFileSystemPlugIn : public FileSystemPlugIn {
   virtual XRootDStatus Rm(const std::string &path, ResponseHandler *handler,
                           uint16_t timeout) override;
 
+  virtual XRootDStatus MkDir(const std::string &path, MkDirFlags::Flags flags,
+                             Access::Mode mode, ResponseHandler *handler,
+                             uint16_t timeout) override;
+
+  virtual XRootDStatus RmDir(const std::string &path, ResponseHandler *handler,
+                             uint16_t timeout) override;
+
+  virtual XRootDStatus DirList(const std::string &path,
+                               DirListFlags::Flags flags,
+                               ResponseHandler *handler,
+                               uint16_t timeout) override;
+
   virtual XRootDStatus ChMod(const std::string &path, Access::Mode mode,
                              ResponseHandler *handler,
                              uint16_t timeout) override;

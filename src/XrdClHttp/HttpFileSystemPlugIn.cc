@@ -14,6 +14,35 @@
 #include "HttpPlugInUtil.hh"
 #include "Posix.hh"
 
+namespace {
+
+template <typename Container>
+Container SplitString(const std::string &input,
+                      const std::string &delimiter) {
+  size_t start = 0;
+  size_t end = 0;
+  size_t length = 0;
+
+  auto result = Container{};
+
+  do {
+    end = input.find(delimiter, start);
+
+    if (end != std::string::npos)
+      length = end - start;
+    else
+      length = input.length() - start;
+
+    if (length) result.push_back(input.substr(start, length));
+
+    start = end + delimiter.size();
+  } while (end != std::string::npos);
+
+  return result;
+}
+
+}  // namespace
+
 namespace XrdCl {
 
 HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
@@ -80,6 +109,44 @@ XRootDStatus HttpFileSystemPlugIn::Rm(const std::string &path,
 
   handler->HandleResponse(new XRootDStatus(status), nullptr);
 
+  return XRootDStatus();
+}
+
+XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
+                                         MkDirFlags::Flags flags,
+                                         Access::Mode mode,
+                                         ResponseHandler *handler,
+                                         uint16_t timeout) {
+  logger_->Debug(
+      kLogXrdClHttp,
+      "HttpFileSystemPlugIn::MkDir - path = %s, flags = %d, timeout = %d",
+      path.c_str(), flags, timeout);
+
+  if (flags & MkDirFlags::MakePath) {
+    auto dirs = SplitString<std::vector<std::string>>(path, "/");
+    for (const auto &d : dirs) {
+      logger_->Debug(kLogXrdClHttp, "DIR: %s", d.c_str());
+    }
+  }
+
+  handler->HandleResponse(new XRootDStatus(), nullptr);
+  return XRootDStatus();
+}
+
+XRootDStatus HttpFileSystemPlugIn::RmDir(const std::string &path,
+                                         ResponseHandler *handler,
+                                         uint16_t timeout) {
+  handler->HandleResponse(new XRootDStatus(), nullptr);
+  return XRootDStatus();
+}
+
+XRootDStatus HttpFileSystemPlugIn::DirList(const std::string &path,
+                                           DirListFlags::Flags flags,
+                                           ResponseHandler *handler,
+                                           uint16_t timeout) {
+  // Handle the cases of stat calls for each item and that of
+  // recursive listing
+  handler->HandleResponse(new XRootDStatus(), nullptr);
   return XRootDStatus();
 }
 
