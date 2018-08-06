@@ -5,8 +5,9 @@
 #ifndef __HTTP_FILE_SYSTEM_PLUG_IN_
 #define __HTTP_FILE_SYSTEM_PLUG_IN_
 
-#include "XrdCl/XrdClPlugInInterface.hh"
+#include "davix.hpp"
 
+#include "XrdCl/XrdClPlugInInterface.hh"
 #include "XrdCl/XrdClURL.hh"
 
 #include <unordered_map>
@@ -23,6 +24,9 @@ class HttpFileSystemPlugIn : public FileSystemPlugIn {
                                 ResponseHandler *handler,
                                 uint16_t timeout) override;
 
+  virtual XRootDStatus Rm(const std::string &path, ResponseHandler *handler,
+                          uint16_t timeout) override;
+
   virtual XRootDStatus ChMod(const std::string &path, Access::Mode mode,
                              ResponseHandler *handler,
                              uint16_t timeout) override;
@@ -37,6 +41,9 @@ class HttpFileSystemPlugIn : public FileSystemPlugIn {
                            std::string &value) const override;
 
  private:
+  Davix::Context ctx_;
+  Davix::DavPosix davix_client_;
+
   URL url_;
 
   std::unordered_map<std::string, std::string> properties_;

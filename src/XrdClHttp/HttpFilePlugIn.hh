@@ -5,16 +5,15 @@
 #ifndef __HTTP_FILE_PLUG_IN_
 #define __HTTP_FILE_PLUG_IN_
 
-#include <cstdint>
-
-#include <limits>
-#include <unordered_map>
+#include "davix.hpp"
 
 #include "XrdCl/XrdClFile.hh"
 #include "XrdCl/XrdClFileSystem.hh"
 #include "XrdCl/XrdClPlugInInterface.hh"
 
-#include "davix.hpp"
+#include <cstdint>
+#include <limits>
+#include <unordered_map>
 
 namespace XrdCl {
 

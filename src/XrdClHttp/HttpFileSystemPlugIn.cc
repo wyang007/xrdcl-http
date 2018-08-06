@@ -10,8 +10,6 @@
 #include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClXRootDResponses.hh"
 
-#include "davix.hpp"
-
 #include "HttpFilePlugIn.hh"
 #include "HttpPlugInUtil.hh"
 #include "Posix.hh"
@@ -19,7 +17,7 @@
 namespace XrdCl {
 
 HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
-    : url_(url), logger_(DefaultEnv::GetLog()) {
+    : ctx_(), davix_client_(&ctx_), url_(url), logger_(DefaultEnv::GetLog()) {
   SetUpLogging(logger_);
   logger_->Debug(kLogXrdClHttp,
                  "HttpFileSystemPlugIn constructed with URL: %s.",
@@ -40,6 +38,26 @@ XRootDStatus HttpFileSystemPlugIn::Truncate(const std::string &path,
   return XRootDStatus(stError, errNotSupported);
 }
 
+XRootDStatus HttpFileSystemPlugIn::Rm(const std::string &path,
+                                      ResponseHandler *handler,
+                                      uint16_t timeout) {
+  const auto full_path = url_.GetLocation() + path;
+
+  logger_->Debug(kLogXrdClHttp,
+                 "HttpFileSystemPlugIn::Rm - path = %s, timeout = %d",
+                 full_path.c_str(), timeout);
+
+  auto status = Posix::Unlink(davix_client_, full_path, timeout);
+
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "Rm failed: %s", status.ToStr().c_str());
+  }
+
+  handler->HandleResponse(new XRootDStatus(status), nullptr);
+
+  return XRootDStatus();
+}
+
 XRootDStatus HttpFileSystemPlugIn::ChMod(const std::string &path,
                                          Access::Mode mode,
                                          ResponseHandler *handler,
@@ -57,16 +75,15 @@ XRootDStatus HttpFileSystemPlugIn::ChMod(const std::string &path,
 XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,
                                         ResponseHandler *handler,
                                         uint16_t timeout) {
+  const auto full_path = url_.GetLocation() + path;
+
   logger_->Debug(kLogXrdClHttp,
                  "HttpFileSystemPlugIn::Stat - path = %s, timeout = %d",
-                 path.c_str(), timeout);
-
-  Davix::Context ctx;
-  Davix::DavPosix davix_client(&ctx);
+                 full_path.c_str(), timeout);
 
   auto stat_info = new StatInfo();
   auto status =
-      Posix::Stat(davix_client, url_.GetLocation(), timeout, stat_info);
+      Posix::Stat(davix_client_, full_path, timeout, stat_info);
 
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());

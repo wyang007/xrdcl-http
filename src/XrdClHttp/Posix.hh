@@ -24,6 +24,9 @@ namespace Posix {
 XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
                   uint16_t timeout, StatInfo* stat_info);
 
+XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
+                    uint16_t timeout);
+
 }  // namespace Posix
 
 }  // namespace XrdCl
