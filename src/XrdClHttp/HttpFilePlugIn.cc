@@ -325,16 +325,6 @@ XRootDStatus HttpFilePlugIn::Fcntl( const Buffer    &arg,
   return XRootDStatus( stError, errNotSupported );
 }
 
-XRootDStatus HttpFilePlugIn::Visa( ResponseHandler *handler,
-                                   uint16_t         timeout )
-{
-  (void)handler; (void)timeout;
-
-  logger_->Debug(kLogXrdClHttp, "Visa not supported with HTTP.");
-
-  return XRootDStatus( stError, errNotSupported );
-}
-
 bool HttpFilePlugIn::IsOpen() const
 {
   return is_open_;

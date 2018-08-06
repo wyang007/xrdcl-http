@@ -94,12 +94,6 @@ class HttpFilePlugIn : public FilePlugIn {
                               uint16_t         timeout ) override;
 
   //------------------------------------------------------------------------
-  //! @see XrdCl::File::Visa
-  //------------------------------------------------------------------------
-  virtual XRootDStatus Visa( ResponseHandler *handler,
-                             uint16_t         timeout ) override;
-
-  //------------------------------------------------------------------------
   //! @see XrdCl::File::IsOpen
   //------------------------------------------------------------------------
   virtual bool IsOpen() const override;
