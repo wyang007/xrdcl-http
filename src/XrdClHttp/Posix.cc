@@ -5,10 +5,37 @@
 #include "Posix.hh"
 
 #include "XrdCl/XrdClStatus.hh"
+#include "XrdCl/XrdClURL.hh"
 
 #include <davix.hpp>
 
+#include <string>
+
 namespace {
+
+std::vector<std::string> SplitString(const std::string& input,
+                                     const std::string& delimiter) {
+  size_t start = 0;
+  size_t end = 0;
+  size_t length = 0;
+
+  auto result = std::vector<std::string>{};
+
+  do {
+    end = input.find(delimiter, start);
+
+    if (end != std::string::npos)
+      length = end - start;
+    else
+      length = input.length() - start;
+
+    if (length) result.push_back(input.substr(start, length));
+
+    start = end + delimiter.size();
+  } while (end != std::string::npos);
+
+  return result;
+}
 
 void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
   if (timeout != 0) {
@@ -23,6 +50,51 @@ namespace XrdCl {
 
 namespace Posix {
 
+XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
+                   XrdCl::MkDirFlags::Flags flags, XrdCl::Access::Mode /*mode*/,
+                   uint16_t timeout) {
+  Davix::RequestParams params;
+  SetTimeout(params, timeout);
+
+  auto url = XrdCl::URL(path);
+
+  if (flags & XrdCl::MkDirFlags::MakePath) {
+    // Also create intermediate directories
+
+    auto dirs = SplitString(url.GetPath(), "/");
+    dirs.pop_back();
+
+    std::string dirs_cumul;
+    for (const auto& d : dirs) {
+      dirs_cumul += d + "/";
+      url.SetPath(dirs_cumul);
+      Davix::DavixError* err = nullptr;
+      if (davix_client.mkdir(&params, url.GetLocation(), S_IRWXU, &err)) {
+        auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                      err->getErrMsg());
+        delete err;
+        return errStatus;
+      }
+    }
+  } else {
+    // Only create final directory
+    auto pos = url.GetPath().find_last_of('/');
+    auto full_dir_path = pos != std::string::npos ?
+      url.GetPath().substr(0, pos) :
+      std::string("/");
+    url.SetPath(full_dir_path);
+    Davix::DavixError* err = nullptr;
+    if (davix_client.mkdir(&params, url.GetLocation(), S_IRWXU, &err)) {
+      auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                    err->getErrMsg());
+      delete err;
+      return errStatus;
+    }
+  }
+
+  return XRootDStatus();
+}
+
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout) {
   Davix::RequestParams params;
@@ -30,7 +102,8 @@ XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
 
   Davix::DavixError* err = nullptr;
   if (davix_client.rename(&params, source, dest, &err)) {
-    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
     return errStatus;
   }
@@ -46,7 +119,8 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
   struct stat stats;
   Davix::DavixError* err = nullptr;
   if (davix_client.stat(&params, url, &stats, &err)) {
-    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
     return errStatus;
   }
@@ -69,7 +143,8 @@ XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
 
   Davix::DavixError* err = nullptr;
   if (davix_client.unlink(&params, url, &err)) {
-    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
     return errStatus;
   }

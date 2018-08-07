@@ -5,6 +5,7 @@
 #ifndef __HTTP_STAT_
 #define __HTTP_STAT_
 
+#include "XrdCl/XrdClFileSystem.hh"
 #include "XrdCl/XrdClXRootDResponses.hh"
 
 #include <cstdint>
@@ -20,6 +21,10 @@ namespace XrdCl {
 class StatInfo;
 
 namespace Posix {
+
+XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
+                   MkDirFlags::Flags flags, Access::Mode mode,
+                   uint16_t timeout);
 
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout);

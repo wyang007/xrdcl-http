@@ -14,35 +14,6 @@
 #include "HttpPlugInUtil.hh"
 #include "Posix.hh"
 
-namespace {
-
-template <typename Container>
-Container SplitString(const std::string &input,
-                      const std::string &delimiter) {
-  size_t start = 0;
-  size_t end = 0;
-  size_t length = 0;
-
-  auto result = Container{};
-
-  do {
-    end = input.find(delimiter, start);
-
-    if (end != std::string::npos)
-      length = end - start;
-    else
-      length = input.length() - start;
-
-    if (length) result.push_back(input.substr(start, length));
-
-    start = end + delimiter.size();
-  } while (end != std::string::npos);
-
-  return result;
-}
-
-}  // namespace
-
 namespace XrdCl {
 
 HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
@@ -122,14 +93,14 @@ XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
       "HttpFileSystemPlugIn::MkDir - path = %s, flags = %d, timeout = %d",
       path.c_str(), flags, timeout);
 
-  if (flags & MkDirFlags::MakePath) {
-    auto dirs = SplitString<std::vector<std::string>>(path, "/");
-    for (const auto &d : dirs) {
-      logger_->Debug(kLogXrdClHttp, "DIR: %s", d.c_str());
-    }
+  auto status = Posix::MkDir(davix_client_, path, flags, mode, timeout);
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "MkDir failed: %s", status.ToStr().c_str());
+    return status;
   }
 
-  handler->HandleResponse(new XRootDStatus(), nullptr);
+  handler->HandleResponse(new XRootDStatus(status), nullptr);
+
   return XRootDStatus();
 }
 
