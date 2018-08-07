@@ -26,6 +26,9 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
                    MkDirFlags::Flags flags, Access::Mode mode,
                    uint16_t timeout);
 
+XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
+                   uint16_t timeout);
+
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout);
 

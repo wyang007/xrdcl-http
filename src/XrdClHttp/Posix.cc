@@ -62,34 +62,49 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
     // Also create intermediate directories
 
     auto dirs = SplitString(url.GetPath(), "/");
-    dirs.pop_back();
 
     std::string dirs_cumul;
     for (const auto& d : dirs) {
-      dirs_cumul += d + "/";
+      dirs_cumul += "/" + d;
       url.SetPath(dirs_cumul);
       Davix::DavixError* err = nullptr;
       if (davix_client.mkdir(&params, url.GetLocation(), S_IRWXU, &err)) {
+        if (err->getStatus() != Davix::StatusCode::FileExist) {
+          auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                        err->getErrMsg());
+          delete err;
+          return errStatus;
+        }
+      }
+    }
+  } else {
+    // Only create final directory
+    Davix::DavixError* err = nullptr;
+    if (davix_client.mkdir(&params, url.GetURL(), S_IRWXU, &err)) {
+      if (err->getStatus() != Davix::StatusCode::FileExist) {
         auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
                                       err->getErrMsg());
         delete err;
         return errStatus;
       }
     }
-  } else {
-    // Only create final directory
-    auto pos = url.GetPath().find_last_of('/');
-    auto full_dir_path = pos != std::string::npos ?
-      url.GetPath().substr(0, pos) :
-      std::string("/");
-    url.SetPath(full_dir_path);
-    Davix::DavixError* err = nullptr;
-    if (davix_client.mkdir(&params, url.GetLocation(), S_IRWXU, &err)) {
-      auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
-                                    err->getErrMsg());
-      delete err;
-      return errStatus;
-    }
+  }
+
+  return XRootDStatus();
+}
+
+XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
+                   uint16_t timeout) {
+  Davix::RequestParams params;
+  SetTimeout(params, timeout);
+
+  auto url = XrdCl::URL(path);
+  Davix::DavixError* err = nullptr;
+  if (davix_client.rmdir(&params, url.GetLocation(), &err)) {
+    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                  err->getErrMsg());
+    delete err;
+    return errStatus;
   }
 
   return XRootDStatus();
