@@ -88,12 +88,14 @@ XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
                                          Access::Mode mode,
                                          ResponseHandler *handler,
                                          uint16_t timeout) {
+  url_.SetPath(path);
+
   logger_->Debug(
       kLogXrdClHttp,
       "HttpFileSystemPlugIn::MkDir - path = %s, flags = %d, timeout = %d",
-      path.c_str(), flags, timeout);
+      url_.GetURL().c_str(), flags, timeout);
 
-  auto status = Posix::MkDir(davix_client_, path, flags, mode, timeout);
+  auto status = Posix::MkDir(davix_client_, url_.GetURL(), flags, mode, timeout);
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "MkDir failed: %s", status.ToStr().c_str());
     return status;
@@ -107,7 +109,20 @@ XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
 XRootDStatus HttpFileSystemPlugIn::RmDir(const std::string &path,
                                          ResponseHandler *handler,
                                          uint16_t timeout) {
-  handler->HandleResponse(new XRootDStatus(), nullptr);
+  const auto full_path = url_.GetLocation() + path;
+
+  logger_->Debug(
+      kLogXrdClHttp,
+      "HttpFileSystemPlugIn::RmDir - path = %s, timeout = %d",
+      path.c_str(), timeout);
+
+  auto status = Posix::RmDir(davix_client_, path, timeout);
+  if (status.IsError()) {
+    logger_->Error(kLogXrdClHttp, "RmDir failed: %s", status.ToStr().c_str());
+    return status;
+  }
+
+  handler->HandleResponse(new XRootDStatus(status), nullptr);
   return XRootDStatus();
 }
 
