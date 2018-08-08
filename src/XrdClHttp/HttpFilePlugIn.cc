@@ -70,9 +70,8 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
   // O_CREAT is always assumed, we try to create parents paths, too
   auto full_path = XrdCl::URL(url).GetLocation();
   auto pos = full_path.find_last_of('/');
-  auto base_dir = pos != std::string::npos ?
-    full_path.substr(0, pos) :
-    full_path;
+  auto base_dir =
+      pos != std::string::npos ? full_path.substr(0, pos) : full_path;
   auto mkdir_status =
       Posix::MkDir(davix_client_, base_dir, XrdCl::MkDirFlags::MakePath,
                    XrdCl::Access::None, timeout);
@@ -88,14 +87,13 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     auto stat_info = new StatInfo();
     auto status = Posix::Stat(davix_client_, url, timeout, stat_info);
     if (status.IsOK()) {
-      Davix::DavixError *err = nullptr;
-      if (davix_client_.unlink(&params, url, &err)) {
+      auto unlink_status = Posix::Unlink(davix_client_, url, timeout);
+      if (unlink_status.IsError()) {
         logger_->Error(
             kLogXrdClHttp,
             "Could not delete existing destination file: %s. Error: %s",
-            url.c_str(), err->getErrMsg().c_str());
-        delete err;
-        return XRootDStatus(stError, errUnknown);
+            url.c_str(), unlink_status.GetErrorMessage().c_str());
+        return unlink_status;
       }
     }
   }
@@ -106,14 +104,15 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
                  "Open: URL: %s, XRootD flags: %d, POSIX flags: %d",
                  url.c_str(), flags, posix_open_flags);
 
-  Davix::DavixError *err = nullptr;
-  davix_fd_ = davix_client_.open(&params, url, posix_open_flags, &err);
-  if (!davix_fd_) {
+  // res == std::pair<fd, XRootDStatus>
+  auto res = Posix::Open(davix_client_, url, posix_open_flags, timeout);
+  if (!res.first) {
     logger_->Error(kLogXrdClHttp, "Could not open: %s, error: %s", url.c_str(),
-                   err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+                   res.second.ToStr().c_str());
+    return res.second;
   }
+
+  davix_fd_ = res.first;
 
   logger_->Debug(kLogXrdClHttp, "Opened: %s", url.c_str());
 
@@ -134,22 +133,19 @@ XRootDStatus HttpFilePlugIn::Close(ResponseHandler *handler,
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  Davix::DavixError *err = nullptr;
+  logger_->Debug(kLogXrdClHttp, "Closing davix fd: %ld", davix_fd_);
 
-  if (davix_client_.close(davix_fd_, &err)) {
+  auto status = Posix::Close(davix_client_, davix_fd_);
+  if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not close davix fd: %ld, error: %s",
-                   davix_fd_, err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+                   davix_fd_, status.ToStr().c_str());
+    return status;
   }
-
-  logger_->Debug(kLogXrdClHttp, "Closed davix fd: %ld", davix_fd_);
 
   is_open_ = false;
   url_.clear();
 
-  auto status = new XRootDStatus();
-  handler->HandleResponse(status, nullptr);
+  handler->HandleResponse(new XRootDStatus(), nullptr);
 
   return XRootDStatus();
 }
@@ -189,14 +185,15 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
   }
 
   Davix::DavixError *err = nullptr;
-  int num_bytes_read =
-      davix_client_.pread(davix_fd_, buffer, size, offset, &err);
-  if (num_bytes_read < 0) {
+  // res = std::pair<int, XRootDStatus>
+  auto res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+  if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not read URL: %s, error: %s",
-                   url_.c_str(), err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+                   url_.c_str(), res.second.ToStr().c_str());
+    return res.second;
   }
+
+  int num_bytes_read = res.first;
 
   logger_->Debug(kLogXrdClHttp, "Read %d bytes, at offset %d, from URL: %s",
                  num_bytes_read, offset, url_.c_str());
@@ -219,27 +216,19 @@ XRootDStatus HttpFilePlugIn::Write(uint64_t offset, uint32_t size,
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  Davix::DavixError *err = nullptr;
-  int new_offset = davix_client_.lseek64(davix_fd_, offset, 0, &err);
-  if (new_offset != offset) {
-    logger_->Error(kLogXrdClHttp, "Could not seek to offset %ld, error: %s",
-                   offset, err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
-  }
-  int num_bytes_written = davix_client_.write(davix_fd_, buffer, size, &err);
-  if (num_bytes_written < 0) {
+  // res == std::pair<int, XRootDStatus>
+  auto res =
+      Posix::PWrite(davix_client_, davix_fd_, offset, size, buffer, timeout);
+  if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not write URL: %s, error: %s",
-                   url_.c_str(), err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+                   url_.c_str(), res.second.ToStr().c_str());
+    return res.second;
   }
 
   logger_->Debug(kLogXrdClHttp, "Wrote %d bytes, at offset %d, to URL: %s",
-                 num_bytes_written, offset, url_.c_str());
+                 res.first, offset, url_.c_str());
 
-  auto status = new XRootDStatus();
-  handler->HandleResponse(status, nullptr);
+  handler->HandleResponse(new XRootDStatus(), nullptr);
 
   return XRootDStatus();
 }
@@ -283,15 +272,15 @@ XRootDStatus HttpFilePlugIn::VectorRead(const ChunkList &chunks, void *buffer,
     input_vector[i].diov_buffer = chunks[i].buffer;
   }
 
-  Davix::DavixError *err = nullptr;
-  int num_bytes_read = davix_client_.preadVec(
-      davix_fd_, input_vector.data(), output_vector.data(), num_chunks, &err);
-  if (num_bytes_read < 0) {
+  // res == std::pair<int, XRootDStatus>
+  auto res = Posix::PReadVec(davix_client_, davix_fd_, chunks, buffer);
+  if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not vectorRead URL: %s, error: %s",
-                   url_.c_str(), err->getErrMsg().c_str());
-    delete err;
-    return XRootDStatus(stError, errUnknown);
+                   url_.c_str(), res.second.ToStr().c_str());
+    return res.second;
   }
+
+  int num_bytes_read = res.first;
 
   logger_->Debug(kLogXrdClHttp, "VecRead %d bytes, from URL: %s",
                  num_bytes_read, url_.c_str());

@@ -7,8 +7,6 @@
 #include "XrdCl/XrdClStatus.hh"
 #include "XrdCl/XrdClURL.hh"
 
-#include <davix.hpp>
-
 #include <string>
 
 namespace {
@@ -46,9 +44,34 @@ void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
 
 }  // namespace
 
-namespace XrdCl {
-
 namespace Posix {
+
+using namespace XrdCl;
+
+std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
+                                        const std::string& url, int flags,
+                                        uint16_t timeout) {
+  Davix::RequestParams params;
+  SetTimeout(params, timeout);
+  Davix::DavixError* err = nullptr;
+  DAVIX_FD* fd = davix_client.open(&params, url, flags, &err);
+  auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
+                                   err->getErrMsg())
+                    : XRootDStatus();
+  return std::make_pair(fd, status);
+}
+
+XRootDStatus Close(Davix::DavPosix& davix_client, DAVIX_FD* fd) {
+  Davix::DavixError* err = nullptr;
+  if (davix_client.close(fd, &err)) {
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    delete err;
+    return errStatus;
+  }
+
+  return XRootDStatus();
+}
 
 XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
                    XrdCl::MkDirFlags::Flags flags, XrdCl::Access::Mode /*mode*/,
@@ -56,7 +79,7 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
   Davix::RequestParams params;
   SetTimeout(params, timeout);
 
-  auto DoMkDir = [&davix_client, &params] (const std::string& path) {
+  auto DoMkDir = [&davix_client, &params](const std::string& path) {
     Davix::DavixError* err = nullptr;
     if (davix_client.mkdir(&params, path, S_IRWXU, &err) &&
         (err->getStatus() != Davix::StatusCode::FileExist)) {
@@ -104,8 +127,8 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
   auto url = XrdCl::URL(path);
   Davix::DavixError* err = nullptr;
   if (davix_client.rmdir(&params, url.GetLocation(), &err)) {
-    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
-                                  err->getErrMsg());
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
     return errStatus;
   }
@@ -170,6 +193,69 @@ XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
   return XRootDStatus();
 }
 
-}  // namespace Posix
+std::pair<int, XRootDStatus> PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
+                                   void* buffer, uint32_t size,
+                                   uint64_t offset) {
+  Davix::DavixError* err = nullptr;
+  int num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
+  if (num_bytes_read < 0) {
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    delete err;
+    return std::make_pair(num_bytes_read, errStatus);
+  }
 
-}  // namespace XrdCl
+  return std::make_pair(num_bytes_read, XRootDStatus());
+}
+
+std::pair<int, XrdCl::XRootDStatus> PReadVec(Davix::DavPosix& davix_client,
+                                             DAVIX_FD* fd,
+                                             const XrdCl::ChunkList& chunks,
+                                             void* buffer) {
+  const auto num_chunks = chunks.size();
+  std::vector<Davix::DavIOVecInput> input_vector(num_chunks);
+  std::vector<Davix::DavIOVecOuput> output_vector(num_chunks);
+
+  for (size_t i = 0; i < num_chunks; ++i) {
+    input_vector[i].diov_offset = chunks[i].offset;
+    input_vector[i].diov_size = chunks[i].length;
+    input_vector[i].diov_buffer = chunks[i].buffer;
+  }
+
+  Davix::DavixError *err = nullptr;
+  int num_bytes_read = davix_client.preadVec(
+      fd, input_vector.data(), output_vector.data(), num_chunks, &err);
+  if (num_bytes_read < 0) {
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    delete err;
+    return std::make_pair(num_bytes_read, XRootDStatus(stError, errUnknown));
+  }
+
+  return std::make_pair(num_bytes_read, XRootDStatus());
+}
+
+std::pair<int, XrdCl::XRootDStatus> PWrite(Davix::DavPosix& davix_client,
+                                           DAVIX_FD* fd, uint64_t offset,
+                                           uint32_t size, const void* buffer,
+                                           uint16_t timeout) {
+  Davix::DavixError* err = nullptr;
+  int new_offset = davix_client.lseek(fd, offset, SEEK_SET, &err);
+  if (new_offset != offset) {
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    delete err;
+    return std::make_pair(new_offset, errStatus);
+  }
+  int num_bytes_written = davix_client.write(fd, buffer, size, &err);
+  if (num_bytes_written < 0) {
+    auto errStatus =
+        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+    delete err;
+    return std::make_pair(num_bytes_written, errStatus);
+  }
+
+  return std::make_pair(num_bytes_written, XRootDStatus());
+}
+
+}  // namespace Posix
