@@ -51,13 +51,14 @@ XRootDStatus HttpFileSystemPlugIn::Mv(const std::string &source,
 XRootDStatus HttpFileSystemPlugIn::Rm(const std::string &path,
                                       ResponseHandler *handler,
                                       uint16_t timeout) {
-  const auto full_path = url_.GetLocation() + path;
+  auto url = url_;
+  url.SetPath(path);
 
   logger_->Debug(kLogXrdClHttp,
                  "HttpFileSystemPlugIn::Rm - path = %s, timeout = %d",
-                 full_path.c_str(), timeout);
+                 url.GetURL().c_str(), timeout);
 
-  auto status = Posix::Unlink(davix_client_, full_path, timeout);
+  auto status = Posix::Unlink(davix_client_, url.GetURL(), timeout);
 
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Rm failed: %s", status.ToStr().c_str());
@@ -74,14 +75,15 @@ XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
                                          Access::Mode mode,
                                          ResponseHandler *handler,
                                          uint16_t timeout) {
-  url_.SetPath(path);
+  auto url = url_;
+  url.SetPath(path);
 
   logger_->Debug(
       kLogXrdClHttp,
       "HttpFileSystemPlugIn::MkDir - path = %s, flags = %d, timeout = %d",
-      url_.GetURL().c_str(), flags, timeout);
+      url.GetURL().c_str(), flags, timeout);
 
-  auto status = Posix::MkDir(davix_client_, url_.GetURL(), flags, mode, timeout);
+  auto status = Posix::MkDir(davix_client_, url.GetURL(), flags, mode, timeout);
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "MkDir failed: %s", status.ToStr().c_str());
     return status;
@@ -95,14 +97,15 @@ XRootDStatus HttpFileSystemPlugIn::MkDir(const std::string &path,
 XRootDStatus HttpFileSystemPlugIn::RmDir(const std::string &path,
                                          ResponseHandler *handler,
                                          uint16_t timeout) {
-  const auto full_path = url_.GetLocation() + path;
+  auto url = url_;
+  url.SetPath(path);
 
   logger_->Debug(
       kLogXrdClHttp,
       "HttpFileSystemPlugIn::RmDir - path = %s, timeout = %d",
-      path.c_str(), timeout);
+      url.GetURL().c_str(), timeout);
 
-  auto status = Posix::RmDir(davix_client_, path, timeout);
+  auto status = Posix::RmDir(davix_client_, url.GetURL(), timeout);
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "RmDir failed: %s", status.ToStr().c_str());
     return status;
