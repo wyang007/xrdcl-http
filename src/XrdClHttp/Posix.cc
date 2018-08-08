@@ -56,6 +56,19 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
   Davix::RequestParams params;
   SetTimeout(params, timeout);
 
+  auto DoMkDir = [&davix_client, &params] (const std::string& path) {
+    Davix::DavixError* err = nullptr;
+    if (davix_client.mkdir(&params, path, S_IRWXU, &err) &&
+        (err->getStatus() != Davix::StatusCode::FileExist)) {
+      auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                    err->getErrMsg());
+      delete err;
+      return errStatus;
+    } else {
+      return XRootDStatus();
+    }
+  };
+
   auto url = XrdCl::URL(path);
 
   if (flags & XrdCl::MkDirFlags::MakePath) {
@@ -67,26 +80,16 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
     for (const auto& d : dirs) {
       dirs_cumul += "/" + d;
       url.SetPath(dirs_cumul);
-      Davix::DavixError* err = nullptr;
-      if (davix_client.mkdir(&params, url.GetLocation(), S_IRWXU, &err)) {
-        if (err->getStatus() != Davix::StatusCode::FileExist) {
-          auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
-                                        err->getErrMsg());
-          delete err;
-          return errStatus;
-        }
+      auto status = DoMkDir(url.GetLocation());
+      if (status.IsError()) {
+        return status;
       }
     }
   } else {
     // Only create final directory
-    Davix::DavixError* err = nullptr;
-    if (davix_client.mkdir(&params, url.GetURL(), S_IRWXU, &err)) {
-      if (err->getStatus() != Davix::StatusCode::FileExist) {
-        auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
-                                      err->getErrMsg());
-        delete err;
-        return errStatus;
-      }
+    auto status = DoMkDir(url.GetURL());
+    if (status.IsError()) {
+      return status;
     }
   }
 
