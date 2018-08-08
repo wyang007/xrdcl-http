@@ -100,10 +100,9 @@ XRootDStatus HttpFileSystemPlugIn::RmDir(const std::string &path,
   auto url = url_;
   url.SetPath(path);
 
-  logger_->Debug(
-      kLogXrdClHttp,
-      "HttpFileSystemPlugIn::RmDir - path = %s, timeout = %d",
-      url.GetURL().c_str(), timeout);
+  logger_->Debug(kLogXrdClHttp,
+                 "HttpFileSystemPlugIn::RmDir - path = %s, timeout = %d",
+                 url.GetURL().c_str(), timeout);
 
   auto status = Posix::RmDir(davix_client_, url.GetURL(), timeout);
   if (status.IsError()) {
@@ -119,9 +118,31 @@ XRootDStatus HttpFileSystemPlugIn::DirList(const std::string &path,
                                            DirListFlags::Flags flags,
                                            ResponseHandler *handler,
                                            uint16_t timeout) {
-  // Handle the cases of stat calls for each item and that of
-  // recursive listing
-  handler->HandleResponse(new XRootDStatus(), nullptr);
+  auto url = url_;
+  url.SetPath(path);
+  const auto full_path = url.GetLocation();
+
+  logger_->Debug(
+      kLogXrdClHttp,
+      "HttpFileSystemPlugIn::DirList - path = %s, flags = %d, timeout = %d",
+      full_path.c_str(), flags, timeout);
+
+  const bool details = flags & DirListFlags::Stat;
+  const bool recursive = flags & DirListFlags::Recursive;
+
+  // res == std::pair<DirectoryList*, XRootDStatus>
+  auto res =
+      Posix::DirList(davix_client_, full_path, details, recursive, timeout);
+  if (res.second.IsError()) {
+    logger_->Error(kLogXrdClHttp, "Could not list dir: %s, error: %s",
+                   full_path.c_str(), res.second.ToStr().c_str());
+    return res.second;
+  }
+
+  auto obj = new AnyObject();
+  obj->Set(res.first);
+
+  handler->HandleResponse(new XRootDStatus(), obj);
   return XRootDStatus();
 }
 

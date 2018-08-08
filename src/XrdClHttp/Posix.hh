@@ -34,6 +34,10 @@ XrdCl::XRootDStatus MkDir(Davix::DavPosix& davix_client,
 XrdCl::XRootDStatus RmDir(Davix::DavPosix& davix_client,
                           const std::string& path, uint16_t timeout);
 
+std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
+    Davix::DavPosix& davix_client, const std::string& path, bool details,
+    bool recursive, uint16_t timeout);
+
 XrdCl::XRootDStatus Rename(Davix::DavPosix& davix_client,
                            const std::string& source, const std::string& dest,
                            uint16_t timeout);

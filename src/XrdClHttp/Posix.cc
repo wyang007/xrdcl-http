@@ -135,6 +135,12 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
   return XRootDStatus();
 }
 
+std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
+    Davix::DavPosix& davix_client, const std::string& path, bool details,
+    bool recursive, uint16_t timeout) {
+  return std::make_pair(nullptr, XRootDStatus());
+}
+
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout) {
   Davix::RequestParams params;
@@ -221,7 +227,7 @@ std::pair<int, XrdCl::XRootDStatus> PReadVec(Davix::DavPosix& davix_client,
     input_vector[i].diov_buffer = chunks[i].buffer;
   }
 
-  Davix::DavixError *err = nullptr;
+  Davix::DavixError* err = nullptr;
   int num_bytes_read = davix_client.preadVec(
       fd, input_vector.data(), output_vector.data(), num_chunks, &err);
   if (num_bytes_read < 0) {

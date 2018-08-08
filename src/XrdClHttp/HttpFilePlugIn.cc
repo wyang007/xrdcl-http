@@ -79,7 +79,7 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     logger_->Error(kLogXrdClHttp,
                    "Could not create parent directories when opening: %s",
                    url.c_str());
-    return XRootDStatus(stError, errUnknown);
+    return mkdir_status;
   }
 
   if (((flags & OpenFlags::Write) || (flags & OpenFlags::Update)) &&
