@@ -124,9 +124,8 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
   Davix::RequestParams params;
   SetTimeout(params, timeout);
 
-  auto url = XrdCl::URL(path);
   Davix::DavixError* err = nullptr;
-  if (davix_client.rmdir(&params, url.GetLocation(), &err)) {
+  if (davix_client.rmdir(&params, path, &err)) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
