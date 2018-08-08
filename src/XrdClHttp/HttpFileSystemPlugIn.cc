@@ -48,20 +48,6 @@ XRootDStatus HttpFileSystemPlugIn::Mv(const std::string &source,
   return XRootDStatus();
 }
 
-XRootDStatus HttpFileSystemPlugIn::Truncate(const std::string &path,
-                                            uint64_t size,
-                                            ResponseHandler *handler,
-                                            uint16_t timeout) {
-  (void)path;
-  (void)size;
-  (void)handler;
-  (void)timeout;
-
-  logger_->Error(kLogXrdClHttp, "Truncate not supported with HTTP");
-
-  return XRootDStatus(stError, errNotSupported);
-}
-
 XRootDStatus HttpFileSystemPlugIn::Rm(const std::string &path,
                                       ResponseHandler *handler,
                                       uint16_t timeout) {
@@ -134,20 +120,6 @@ XRootDStatus HttpFileSystemPlugIn::DirList(const std::string &path,
   // recursive listing
   handler->HandleResponse(new XRootDStatus(), nullptr);
   return XRootDStatus();
-}
-
-XRootDStatus HttpFileSystemPlugIn::ChMod(const std::string &path,
-                                         Access::Mode mode,
-                                         ResponseHandler *handler,
-                                         uint16_t timeout) {
-  (void)path;
-  (void)mode;
-  (void)handler;
-  (void)timeout;
-
-  logger_->Error(kLogXrdClHttp, "ChMod not supported with HTTP");
-
-  return XRootDStatus(stError, errNotSupported);
 }
 
 XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,

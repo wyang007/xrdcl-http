@@ -71,26 +71,12 @@ class HttpFilePlugIn : public FilePlugIn {
                              uint16_t         timeout ) override;
 
   //------------------------------------------------------------------------
-  //! @see XrdCl::File::Truncate
-  //------------------------------------------------------------------------
-  virtual XRootDStatus Truncate( uint64_t         size,
-                                 ResponseHandler *handler,
-                                 uint16_t         timeout ) override;
-
-  //------------------------------------------------------------------------
   //! @see XrdCl::File::VectorRead
   //------------------------------------------------------------------------
   virtual XRootDStatus VectorRead( const ChunkList &chunks,
                                    void            *buffer,
                                    XrdCl::ResponseHandler *handler,
                                    uint16_t         timeout ) override;
-
-  //------------------------------------------------------------------------
-  //! @see File::Fcntl
-  //------------------------------------------------------------------------
-  virtual XRootDStatus Fcntl( const Buffer    &arg,
-                              ResponseHandler *handler,
-                              uint16_t         timeout ) override;
 
   //------------------------------------------------------------------------
   //! @see XrdCl::File::IsOpen

@@ -242,17 +242,6 @@ XRootDStatus HttpFilePlugIn::Sync(ResponseHandler *handler, uint16_t timeout) {
   return XRootDStatus();
 }
 
-XRootDStatus HttpFilePlugIn::Truncate(uint64_t size, ResponseHandler *handler,
-                                      uint16_t timeout) {
-  (void)size;
-  (void)handler;
-  (void)timeout;
-
-  logger_->Error(kLogXrdClHttp, "Truncate not supported with HTTP.");
-
-  return XRootDStatus(stError, errNotSupported);
-}
-
 XRootDStatus HttpFilePlugIn::VectorRead(const ChunkList &chunks, void *buffer,
                                         ResponseHandler *handler,
                                         uint16_t /*timeout*/) {
@@ -300,17 +289,6 @@ XRootDStatus HttpFilePlugIn::VectorRead(const ChunkList &chunks, void *buffer,
   handler->HandleResponse(status, obj);
 
   return XRootDStatus();
-}
-
-XRootDStatus HttpFilePlugIn::Fcntl(const Buffer &arg, ResponseHandler *handler,
-                                   uint16_t timeout) {
-  (void)arg;
-  (void)handler;
-  (void)timeout;
-
-  logger_->Error(kLogXrdClHttp, "Fcntl not supported with HTTP.");
-
-  return XRootDStatus(stError, errNotSupported);
 }
 
 bool HttpFilePlugIn::IsOpen() const { return is_open_; }
