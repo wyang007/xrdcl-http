@@ -5,6 +5,7 @@
 #include "Posix.hh"
 
 #include "XrdCl/XrdClStatus.hh"
+#include "XrdCl/XrdClXRootDResponses.hh"
 #include "XrdCl/XrdClURL.hh"
 
 #include <string>
@@ -40,6 +41,18 @@ void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
     struct timespec ts = {timeout, 0};
     params.setOperationTimeout(&ts);
   }
+}
+
+XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat_info) {
+  std::ostringstream data;
+  data << stats.st_dev << " " << stats.st_size << " " << stats.st_mode << " "
+       << stats.st_mtime;
+
+  if (!stat_info->ParseServerResponse(data.str().c_str())) {
+    return XrdCl::XRootDStatus(XrdCl::stError, XrdCl::errDataError);
+  }
+
+  return XrdCl::XRootDStatus();
 }
 
 }  // namespace
@@ -137,8 +150,56 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
 
 std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
     Davix::DavPosix& davix_client, const std::string& path, bool details,
-    bool recursive, uint16_t timeout) {
-  return std::make_pair(nullptr, XRootDStatus());
+    bool /*recursive*/, uint16_t timeout) {
+  Davix::RequestParams params;
+  SetTimeout(params, timeout);
+
+  auto dir_list = new DirectoryList();
+
+  Davix::DavixError* err = nullptr;
+
+  auto dir_fd = davix_client.opendirpp(&params, path, &err);
+  if (!dir_fd) {
+    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                  err->getErrMsg());
+    delete err;
+    return std::make_pair(nullptr, errStatus);
+  }
+
+  struct stat info;
+  while (auto entry = davix_client.readdirpp(dir_fd, &info, &err)) {
+    if (err) {
+      auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                    err->getErrMsg());
+      delete err;
+      return std::make_pair(nullptr, errStatus);
+    }
+
+    StatInfo* stat_info = nullptr;
+    if (details) {
+      stat_info = new StatInfo();
+      auto res = FillStatInfo(info, stat_info);
+      if (res.IsError()) {
+        delete entry;
+        delete stat_info;
+        return std::make_pair(nullptr, res);
+      }
+    }
+
+    auto list_entry = new DirectoryList::ListEntry(path, entry->d_name, stat_info);
+    dir_list->Add(list_entry);
+
+    delete entry;
+  }
+
+  if (davix_client.closedirpp(dir_fd, &err)) {
+    auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
+                                  err->getErrMsg());
+    delete err;
+    return std::make_pair(nullptr, errStatus);
+  }
+
+  return std::make_pair(dir_list, XRootDStatus());
 }
 
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
@@ -171,12 +232,9 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
     return errStatus;
   }
 
-  std::ostringstream data;
-  data << stats.st_dev << " " << stats.st_size << " " << stats.st_mode << " "
-       << stats.st_mtime;
-
-  if (!stat_info->ParseServerResponse(data.str().c_str())) {
-    return XRootDStatus(stError, errDataError);
+  auto res = FillStatInfo(stats, stat_info);
+  if (res.IsError()) {
+    return res;
   }
 
   return XRootDStatus();
