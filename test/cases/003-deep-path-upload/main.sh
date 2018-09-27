@@ -14,13 +14,14 @@ test_init() {
         echo $s > $WORKSPACE/in/$h
     done
 
-    start_caddy $WORKSPACE/out $WORKSPACE/config/caddyfile
+    # Note: WebDav support is needed to support deep paths at the HTTP destination
+    start_caddy $WORKSPACE/out $WORKSPACE/config/caddyfile-webdav
 }
 
 test_main() {
     for f in $(ls $WORKSPACE/in/) ; do
         echo "Downloading: $WORKSPACE/in/$f"
-        XRD_LOGLEVEL=Debug \
+        #XRD_LOGLEVEL=Debug \
         xrdcp -A -f --silent $WORKSPACE/in/$f http://localhost:8080/aaa/bbb/ccc/$f
         local retrieve=$(xrdcp -A -f --silent http://localhost:8080/aaa/bbb/ccc/$f -)
         local sha1_out=$(str_sha1 $retrieve)
