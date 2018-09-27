@@ -67,19 +67,20 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     params.setOperationTimeout(&ts);
   }
 
-  // O_CREAT is always assumed, we try to create parents paths, too
-  auto full_path = XrdCl::URL(url).GetLocation();
-  auto pos = full_path.find_last_of('/');
-  auto base_dir =
-      pos != std::string::npos ? full_path.substr(0, pos) : full_path;
-  auto mkdir_status =
-      Posix::MkDir(davix_client_, base_dir, XrdCl::MkDirFlags::MakePath,
-                   XrdCl::Access::None, timeout);
-  if (mkdir_status.IsError()) {
-    logger_->Error(kLogXrdClHttp,
-                   "Could not create parent directories when opening: %s",
-                   url.c_str());
-    return mkdir_status;
+  if (flags & (OpenFlags::Append | OpenFlags::Write | OpenFlags::Update | OpenFlags::New)) {
+    auto full_path = XrdCl::URL(url).GetLocation();
+    auto pos = full_path.find_last_of('/');
+    auto base_dir =
+        pos != std::string::npos ? full_path.substr(0, pos) : full_path;
+    auto mkdir_status =
+        Posix::MkDir(davix_client_, base_dir, XrdCl::MkDirFlags::MakePath,
+                    XrdCl::Access::None, timeout);
+    if (mkdir_status.IsError()) {
+      logger_->Error(kLogXrdClHttp,
+                    "Could not create parent directories when opening: %s",
+                    url.c_str());
+      return mkdir_status;
+    }
   }
 
   if (((flags & OpenFlags::Write) || (flags & OpenFlags::Update)) &&
