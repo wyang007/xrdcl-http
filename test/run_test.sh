@@ -24,27 +24,8 @@ check_prefix $XROOTD_PREFIX
 PATH=$XROOTD_PREFIX/bin:$PATH
 LD_LIBRARY_PATH=$XROOTD_PREFIX/lib:$LD_LIBRARY_PATH
 
-# Set up the workspace for the test run
-WORKSPACE=$(create_workspace)
-echo "Using test workspace: $WORKSPACE"
-
-cd $WORKSPACE
-
-# Copy all test config files into the workspace
-cp -r $SCRIPT_LOCATION/config $WORKSPACE/
-
-# Configure the Caddyfile template with the value of $WORKSPACE
-sed -i -e "s:<<CADDY_UPLOAD_DIR>>:$WORKSPACE/out:g" $WORKSPACE/config/caddyfile
-
-# Set up the XRootD client HTTP plugin configuration
-sed -i -e "s:<<XROOTD_PREFIX>>:$XROOTD_PREFIX:g" $WORKSPACE/config/client/http.conf
-XRD_PLUGINCONFDIR=$WORKSPACE/config/client
-
 # Download the caddy HTTP server, if needed
 CADDY_EXEC=/tmp/caddy
-CADDY_PID_FILE=$WORKSPACE/caddy_pid
-CADDY_LOG=$WORKSPACE/caddy.log
-
 if [ ! -f $CADDY_EXEC ] || [ x"$(file_sha1 $CADDY_EXEC)" != x"$CADDY_SHA1" ]; then
     echo "Downloading: $CADDY_URL"
     wget -q -O $CADDY_EXEC $CADDY_URL
@@ -55,8 +36,27 @@ fi
 set +e
 TEST_CASES=$(ls -d $SCRIPT_LOCATION/cases/$TEST_CASE_PATTERN)
 for c in $TEST_CASES ; do
+    # Set up the workspace for the test run
+    WORKSPACE=$(create_workspace)
+
+    cd $WORKSPACE
+
+    # Copy all test config files into the workspace
+    cp -r $SCRIPT_LOCATION/config $WORKSPACE/
+
+    # Configure the Caddyfile template with the value of $WORKSPACE
+    sed -i -e "s:<<CADDY_UPLOAD_DIR>>:$WORKSPACE/out:g" $WORKSPACE/config/caddyfile
+
+    # Set up the XRootD client HTTP plugin configuration
+    sed -i -e "s:<<XROOTD_PREFIX>>:$XROOTD_PREFIX:g" $WORKSPACE/config/client/http.conf
+    XRD_PLUGINCONFDIR=$WORKSPACE/config/client
+
     run_test_case $c &
     wait $!
+
+    clean_up
+
+    cd $SCRIPT_LOCATION
 done
 
 echo "Finished."

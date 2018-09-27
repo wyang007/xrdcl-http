@@ -4,8 +4,6 @@ test_init() {
     local string_length=1024
     local num_files=5
 
-    rm -rf $WORKSPACE/in
-    rm -rf $WORKSPACE/out
     mkdir -p $WORKSPACE/in
     mkdir -p $WORKSPACE/out
 

@@ -5,6 +5,7 @@ run_test_case() {
     local idx=$(basename $test_case_dir | cut -d'-' -f1)
     . $test_case_dir/main.sh
     echo "\nRunning test case $idx: $TEST_CASE_NAME\n"
+    echo "Using test workspace: $WORKSPACE"
     test_init
     test_main
     test_finalize
@@ -18,16 +19,16 @@ start_caddy() {
     ulimit -n 8192
 
     echo -n "Starting Caddy... "
-    $CADDY_EXEC -root $www_root -conf $caddyfile -log $CADDY_LOG -pidfile $CADDY_PID_FILE &
+    $CADDY_EXEC -root $www_root -conf $caddyfile -log $WORKSPACE/caddy.log -pidfile $WORKSPACE/caddy_pid &
     sleep 1
     echo "done."
 }
 
 stop_caddy() {
-    if [ -f $CADDY_PID_FILE ]; then
+    if [ -f $WORKSPACE/caddy_pid ]; then
         echo -n "Stopping Caddy... "
-        kill $(cat $CADDY_PID_FILE)
-        rm -f $CADDY_PID_FILE
+        kill $(cat $WORKSPACE/caddy_pid)
+        rm -f $WORKSPACE/caddy_pid
         echo "done."
     fi
 }
