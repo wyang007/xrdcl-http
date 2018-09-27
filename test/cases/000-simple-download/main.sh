@@ -14,14 +14,14 @@ test_init() {
         echo $s > $WORKSPACE/in/$h
     done
 
-    start_caddy $WORKSPACE/in $WORKSPACE/config/caddyfile
+    start_caddy $WORKSPACE/in
 }
 
 test_main() {
     for f in $(ls $WORKSPACE/in/) ; do
-        #XRD_LOGLEVEL=Debug
         echo "Downloading: $WORKSPACE/in/$f"
-        xrdcp -A -f $WORKSPACE/in/$f $WORKSPACE/out/
+        #XRD_LOGLEVEL=Debug
+        xrdcp -A -f --silent http://localhost:8080/$f $WORKSPACE/out/
         local sha1_out=$(file_sha1 $WORKSPACE/out/$f)
         if [ x"$sha1_out" != x"$f" ]; then
             echo "Error: incorrect transfer of file: $WORKSPACE/in/$f"
