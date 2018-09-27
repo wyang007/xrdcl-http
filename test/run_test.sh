@@ -4,8 +4,8 @@ set -e
 
 # Integration script for the XrdClHttp plugin
 
-CADDY_URL=http://ecsft.cern.ch:80/dist/cvmfs/builddeps/caddy-linux-amd64-webdav
-CADDY_SHA1=3b97ad2b1ab7c575768016d9c4f326cf97a42c1f
+CADDY_URL=http://ecsft.cern.ch:80/dist/cvmfs/builddeps/caddy-linux-amd64
+CADDY_SHA1=0f3d1ea280ec744805cd557f123ec0d785bb1da0
 
 
 SCRIPT_LOCATION=$(cd "$(dirname "$0")"; pwd)
@@ -32,6 +32,9 @@ cd $WORKSPACE
 
 # Copy all test config files into the workspace
 cp -r $SCRIPT_LOCATION/config $WORKSPACE/
+
+# Configure the Caddyfile template with the value of $WORKSPACE
+sed -i -e "s:<<CADDY_UPLOAD_DIR>>:$WORKSPACE/out:g" $WORKSPACE/config/caddyfile
 
 # Set up the XRootD client HTTP plugin configuration
 sed -i -e "s:<<XROOTD_PREFIX>>:$XROOTD_PREFIX:g" $WORKSPACE/config/client/http.conf

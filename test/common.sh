@@ -13,11 +13,12 @@ run_test_case() {
 
 start_caddy() {
     local www_root=$1
+    local caddyfile=$2
 
     ulimit -n 8192
 
     echo -n "Starting Caddy... "
-    $CADDY_EXEC -root $www_root -log $CADDY_LOG -host localhost -port 8080 -pidfile $CADDY_PID_FILE &
+    $CADDY_EXEC -root $www_root -conf $caddyfile -log $CADDY_LOG -pidfile $CADDY_PID_FILE &
     sleep 1
     echo "done."
 }

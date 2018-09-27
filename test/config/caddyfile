@@ -1,2 +1,4 @@
 localhost:8080
-webdav
+upload / {
+    to "<<CADDY_UPLOAD_DIR>>"
+}
