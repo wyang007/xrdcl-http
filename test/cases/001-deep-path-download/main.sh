@@ -4,6 +4,8 @@ test_init() {
     local string_length=1024
     local num_files=5
 
+    rm -rf $WORKSPACE/in
+    rm -rf $WORKSPACE/out
     mkdir -p $WORKSPACE/in/aaa/bbb/ccc
     mkdir -p $WORKSPACE/out
 
@@ -14,7 +16,7 @@ test_init() {
         echo $s > $WORKSPACE/in/aaa/bbb/ccc/$h
     done
 
-    start_caddy $WORKSPACE/in
+    start_caddy $WORKSPACE/in $WORKSPACE/config/caddyfile
 }
 
 test_main() {

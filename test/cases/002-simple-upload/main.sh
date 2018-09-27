@@ -1,4 +1,4 @@
-TEST_CASE_NAME="Download files from an HTTP source"
+TEST_CASE_NAME="Upload files to an HTTP destination"
 
 test_init() {
     local string_length=1024
@@ -16,15 +16,16 @@ test_init() {
         echo $s > $WORKSPACE/in/$h
     done
 
-    start_caddy $WORKSPACE/in $WORKSPACE/config/caddyfile
+    start_caddy $WORKSPACE/out $WORKSPACE/config/caddyfile
 }
 
 test_main() {
     for f in $(ls $WORKSPACE/in/) ; do
         echo "Downloading: $WORKSPACE/in/$f"
         #XRD_LOGLEVEL=Debug \
-        xrdcp -A -f --silent http://localhost:8080/$f $WORKSPACE/out/
-        local sha1_out=$(file_sha1 $WORKSPACE/out/$f)
+        xrdcp -A -f --silent $WORKSPACE/in/$f http://localhost:8080/$f
+        local retrieve=$(xrdcp -A -f --silent http://localhost:8080/$f -)
+        local sha1_out=$(str_sha1 $retrieve)
         if [ x"$sha1_out" != x"$f" ]; then
             echo "Error: incorrect transfer of file: $WORKSPACE/in/$f"
             echo "  SHA1  (in): $f"
