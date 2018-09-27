@@ -2,7 +2,7 @@ TEST_CASE_NAME="Download files from deep paths at an HTTP source"
 
 test_init() {
     local string_length=1024
-    local num_files=50
+    local num_files=5
 
     mkdir -p $WORKSPACE/in/aaa/bbb/ccc
     mkdir -p $WORKSPACE/out
