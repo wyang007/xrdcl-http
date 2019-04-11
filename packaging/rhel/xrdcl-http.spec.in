@@ -1,0 +1,119 @@
+#-------------------------------------------------------------------------------
+# Helper macros
+#-------------------------------------------------------------------------------
+%if %{?rhel:1}%{!?rhel:0}
+    %if %{rhel} >= 7
+        %define use_systemd 1
+        %define have_macaroons 1
+    %else
+        %define use_systemd 0
+        %define have_macaroons 0
+    %endif
+%else
+    %if %{?fedora}%{!?fedora:0} >= 28
+        %define have_macaroons 1
+    %else
+        %define have_macaroons 0
+    %endif
+    %if %{?fedora}%{!?fedora:0} >= 19
+        %define use_systemd 1
+    %else
+        %define use_systemd 0
+    %endif
+%endif
+
+%if %{?fedora}%{!?fedora:0} >= 22
+    %define use_libc_semaphore 1
+%else
+    %define use_libc_semaphore 0
+%endif
+
+%if %{?_with_ceph11:1}%{!?_with_ceph11:0}
+    %define _with_ceph 1
+%endif
+
+# Remove default rpm python bytecompiling scripts
+%global __os_install_post \
+    %(echo '%{__os_install_post}' | \
+      sed -e 's!/usr/lib[^[:space:]]*/brp-python-bytecompile[[:space:]].*$!!g \
+              s!/usr/lib[^[:space:]]*/brp-python-hardlink[[:space:]].*$!!g')
+
+#-------------------------------------------------------------------------------
+# Package definitions
+#-------------------------------------------------------------------------------
+Name:      xrdcl-http
+Epoch:     1
+Version:   __VERSION__
+Release:   __RELEASE__%{?dist}%{?_with_clang:.clang}%{?_with_asan:.asan}
+Summary:   HTTP client plug-in for XRootD client
+Group:     System Environment/Libraries
+License:   LGPLv3+
+URL:       http://xrootd.org/
+
+Source0:   xrdcl-http.tar.gz
+
+BuildRoot: %{_tmppath}/%{name}-root
+
+BuildRequires: cmake
+BuildRequires: xrootd-client-devel
+BuildRequires: davix-devel
+
+%description
+xrdcl-http is an XRootD client plugin which allows XRootD to interact 
+with HTTP repositories.
+
+#-------------------------------------------------------------------------------
+# Build instructions
+#-------------------------------------------------------------------------------
+%prep
+%setup -c -n xrdcl-http
+
+%build
+cd xrdcl-http
+
+mkdir build
+pushd build
+cmake -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=RelWithDebInfo ../
+
+make -i VERBOSE=1 %{?_smp_mflags}
+popd
+
+#-------------------------------------------------------------------------------
+# Installation
+#-------------------------------------------------------------------------------
+%install
+rm -rf $RPM_BUILD_ROOT
+
+pushd xrdcl-http
+pushd  build
+make install DESTDIR=$RPM_BUILD_ROOT
+popd
+
+# client plug-in config
+mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/xrootd/client.plugins.d
+install -m 644 config/http.client.conf.example $RPM_BUILD_ROOT%{_sysconfdir}/xrootd/client.plugins.d/xrdcl-http-plugin.conf
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+#-------------------------------------------------------------------------------
+# RPM scripts
+#-------------------------------------------------------------------------------
+%post   -p /sbin/ldconfig
+%postun -p /sbin/ldconfig
+
+#-------------------------------------------------------------------------------
+# Files
+#-------------------------------------------------------------------------------
+%files
+%defattr(-,root,root,-)
+%{_libdir}/libXrdClHttp-4.so
+%{_sysconfdir}/xrootd/client.plugins.d/xrdcl-http-plugin.conf
+
+#-------------------------------------------------------------------------------
+# Changelog
+#-------------------------------------------------------------------------------
+%changelog
+* Thu Apr 11 2019 Michal Simon <michal.simon@cern.ch> 4.9.1-1
+- the first RPM release - version 4.9.1
+
