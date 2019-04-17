@@ -185,7 +185,6 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  Davix::DavixError *err = nullptr;
   // res = std::pair<int, XRootDStatus>
   auto res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
   if (res.second.IsError()) {

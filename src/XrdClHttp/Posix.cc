@@ -304,7 +304,7 @@ std::pair<int, XrdCl::XRootDStatus> PWrite(Davix::DavPosix& davix_client,
                                            uint16_t timeout) {
   Davix::DavixError* err = nullptr;
   int new_offset = davix_client.lseek(fd, offset, SEEK_SET, &err);
-  if (new_offset != offset) {
+  if (uint64_t(new_offset) != offset) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
