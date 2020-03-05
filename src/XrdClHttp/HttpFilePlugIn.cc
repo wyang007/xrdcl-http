@@ -22,9 +22,6 @@ int MakePosixOpenFlags(XrdCl::OpenFlags::Flags flags) {
   if (flags & XrdCl::OpenFlags::Delete) {
     posix_flags |= O_CREAT | O_TRUNC;
   }
-  if (flags & XrdCl::OpenFlags::Append) {
-    posix_flags |= O_APPEND;
-  }
   if (flags & XrdCl::OpenFlags::Read) {
     posix_flags |= O_RDONLY;
   }
@@ -67,7 +64,7 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     params.setOperationTimeout(&ts);
   }
 
-  if (flags & (OpenFlags::Append | OpenFlags::Write | OpenFlags::Update | OpenFlags::New)) {
+  if (flags & (OpenFlags::Write | OpenFlags::Update | OpenFlags::New)) {
     auto full_path = XrdCl::URL(url).GetLocation();
     auto pos = full_path.find_last_of('/');
     auto base_dir =
