@@ -1,6 +1,6 @@
 if( XRDCLHTTP_SUBMODULE )
   set( XrdCl_INCLUDE_DIRS ${CMAKE_SOURCE_DIR/src} )
-  set( XrdCl_LIBRARIES    ${CMAKE_BINARY_DIR/src} )
+  set( XrdCl_LIBRARIES    XrdCl )
   set( XrdCl_FOUND        TRUE )
 else()
   find_path(
