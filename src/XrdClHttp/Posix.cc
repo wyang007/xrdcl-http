@@ -2,11 +2,18 @@
  * This file is part of XrdClHttp
  */
 
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+
 #include "Posix.hh"
 
 #include "XrdCl/XrdClStatus.hh"
 #include "XrdCl/XrdClXRootDResponses.hh"
 #include "XrdCl/XrdClURL.hh"
+
+#include "davix/auth/davixx509cred.hpp"
+#include "davix/auth/davixauth.hpp"
 
 #include <string>
 
@@ -55,6 +62,56 @@ XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat
   return XrdCl::XRootDStatus();
 }
 
+// return NULL if no X509 proxy is found 
+Davix::X509Credential* LoadX509UserCredential() {
+  std::string myX509proxyFile;
+  if (getenv("X509_USER_PROXY") != NULL)
+    myX509proxyFile = getenv("X509_USER_PROXY");
+  else
+    myX509proxyFile = "/tmp/x509up_u" + std::to_string(geteuid());
+  
+  struct stat myX509proxyStat;
+  Davix::X509Credential* myX509proxy = NULL;
+  if (stat(myX509proxyFile.c_str(), &myX509proxyStat) == 0) {
+    myX509proxy = new Davix::X509Credential();
+    myX509proxy->loadFromFilePEM(myX509proxyFile.c_str(), myX509proxyFile.c_str(), "", NULL);
+  }
+  return myX509proxy;
+}
+
+// see auth/davixauth.hpp
+int LoadX509UserCredentialCallBack(void *userdata, 
+                                   const Davix::SessionInfo &info,
+                                   Davix::X509Credential *cert,
+                                   Davix::DavixError **err) {
+  std::string myX509proxyFile;
+  if (getenv("X509_USER_PROXY") != NULL)
+    myX509proxyFile = getenv("X509_USER_PROXY");
+  else
+    myX509proxyFile = "/tmp/x509up_u" + std::to_string(geteuid());
+  
+  struct stat myX509proxyStat;
+  if (stat(myX509proxyFile.c_str(), &myX509proxyStat) == 0)
+    return cert->loadFromFilePEM(myX509proxyFile.c_str(), myX509proxyFile.c_str(), "", err);
+  else
+    return 1;
+}
+
+void SetX509(Davix::RequestParams& params) {
+  params.setClientCertCallbackX509(&LoadX509UserCredentialCallBack, NULL);
+
+  //Davix::X509Credential* myX509proxy = LoadX509UserCredential();
+  //if (myX509proxy != NULL) {
+  //  params.setClientCertX509(*myX509proxy);
+  //  delete myX509proxy;
+  //}
+
+  if (getenv("X509_CERT_DIR") != NULL)
+    params.addCertificateAuthorityPath(getenv("X509_CERT_DIR"));
+  else
+    params.addCertificateAuthorityPath("/etc/grid-security/certificates");      
+}
+
 }  // namespace
 
 namespace Posix {
@@ -66,6 +123,7 @@ std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
                                         uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
   Davix::DavixError* err = nullptr;
   DAVIX_FD* fd = davix_client.open(&params, url, flags, &err);
   auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
@@ -91,6 +149,7 @@ XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
                    uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   auto DoMkDir = [&davix_client, &params](const std::string& path) {
     Davix::DavixError* err = nullptr;
@@ -136,6 +195,7 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
                    uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   Davix::DavixError* err = nullptr;
   if (davix_client.rmdir(&params, path, &err)) {
@@ -153,6 +213,7 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
     bool /*recursive*/, uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   auto dir_list = new DirectoryList();
 
@@ -206,6 +267,7 @@ XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   Davix::DavixError* err = nullptr;
   if (davix_client.rename(&params, source, dest, &err)) {
@@ -222,6 +284,7 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
                   uint16_t timeout, StatInfo* stat_info) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   struct stat stats;
   Davix::DavixError* err = nullptr;
@@ -244,6 +307,7 @@ XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
                     uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
+  SetX509(params);
 
   Davix::DavixError* err = nullptr;
   if (davix_client.unlink(&params, url, &err)) {
