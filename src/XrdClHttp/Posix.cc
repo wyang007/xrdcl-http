@@ -63,21 +63,21 @@ XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat
 }
 
 // return NULL if no X509 proxy is found 
-Davix::X509Credential* LoadX509UserCredential() {
-  std::string myX509proxyFile;
-  if (getenv("X509_USER_PROXY") != NULL)
-    myX509proxyFile = getenv("X509_USER_PROXY");
-  else
-    myX509proxyFile = "/tmp/x509up_u" + std::to_string(geteuid());
-  
-  struct stat myX509proxyStat;
-  Davix::X509Credential* myX509proxy = NULL;
-  if (stat(myX509proxyFile.c_str(), &myX509proxyStat) == 0) {
-    myX509proxy = new Davix::X509Credential();
-    myX509proxy->loadFromFilePEM(myX509proxyFile.c_str(), myX509proxyFile.c_str(), "", NULL);
-  }
-  return myX509proxy;
-}
+//Davix::X509Credential* LoadX509UserCredential() {
+//  std::string myX509proxyFile;
+//  if (getenv("X509_USER_PROXY") != NULL)
+//    myX509proxyFile = getenv("X509_USER_PROXY");
+//  else
+//    myX509proxyFile = "/tmp/x509up_u" + std::to_string(geteuid());
+//  
+//  struct stat myX509proxyStat;
+//  Davix::X509Credential* myX509proxy = NULL;
+//  if (stat(myX509proxyFile.c_str(), &myX509proxyStat) == 0) {
+//    myX509proxy = new Davix::X509Credential();
+//    myX509proxy->loadFromFilePEM(myX509proxyFile.c_str(), myX509proxyFile.c_str(), "", NULL);
+//  }
+//  return myX509proxy;
+//}
 
 // see auth/davixauth.hpp
 int LoadX509UserCredentialCallBack(void *userdata, 
