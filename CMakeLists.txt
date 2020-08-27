@@ -10,7 +10,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x")
 
 # Defaults
 if( NOT XRDCLHTTP_SUBMODULE )
-  set(PLUGIN_VERSION 5)
+  if( NOT DEFINED PLUGIN_VERSION )
+    set(PLUGIN_VERSION 5)
+  endif()
 endif()
 
 # Options
