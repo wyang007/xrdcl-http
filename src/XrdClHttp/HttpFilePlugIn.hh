@@ -13,6 +13,7 @@
 
 #include <cstdint>
 #include <limits>
+#include <mutex>
 #include <unordered_map>
 
 namespace XrdCl {
@@ -101,6 +102,9 @@ class HttpFilePlugIn : public FilePlugIn {
   Davix::DavPosix davix_client_;
 
   DAVIX_FD* davix_fd_;
+
+  std::mutex offset_locker;
+  uint64_t curr_offset;
 
   bool is_open_;
 

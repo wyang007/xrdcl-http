@@ -44,10 +44,20 @@ std::vector<std::string> SplitString(const std::string& input,
 }
 
 void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
+/*
+ * At NERSC archive portal, we get error when setOperationTimeout()
+ *
   if (timeout != 0) {
     struct timespec ts = {timeout, 0};
     params.setOperationTimeout(&ts);
   }
+*/
+
+  struct timespec ts = {0, 0};
+  ts.tv_sec = 30;
+  params.setConnectionTimeout(&ts);
+
+  params.setOperationRetryDelay(2);
 }
 
 XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat_info) {
@@ -125,6 +135,9 @@ std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
   SetTimeout(params, timeout);
   SetX509(params);
   Davix::DavixError* err = nullptr;
+
+  printf("Posix::Open(%s)\n", url.c_str());
+
   DAVIX_FD* fd = davix_client.open(&params, url, flags, &err);
   auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
                                    err->getErrMsg())
@@ -286,6 +299,8 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
   SetTimeout(params, timeout);
   SetX509(params);
 
+  printf("Posix::Stat(%s)\n", url.c_str());
+
   struct stat stats;
   Davix::DavixError* err = nullptr;
   if (davix_client.stat(&params, url, &stats, &err)) {
@@ -324,7 +339,14 @@ std::pair<int, XRootDStatus> PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
                                    void* buffer, uint32_t size,
                                    uint64_t offset) {
   Davix::DavixError* err = nullptr;
-  int num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
+  int num_bytes_read;
+  printf("Posix::(P)Read(size=%d, offset=%ld)\n", size, offset);
+  if (offset != -1) {
+    num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
+  }
+  else { // continue reading from the current offset position
+    num_bytes_read = davix_client.read(fd, buffer, size, &err); 
+  }
   if (num_bytes_read < 0) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
