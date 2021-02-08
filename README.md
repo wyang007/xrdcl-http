@@ -7,7 +7,11 @@ with HTTP repositories.
 
 ## Build
 
-This project is configured and build using CMake.
+This project is configured and build using CMake. For example
+```
+cmake3 -DCMAKE_BUILD_TYPE=Debug -DCMAKE_INSTALL_LIBDIR=. .
+make
+```
 
 ## Testing
 

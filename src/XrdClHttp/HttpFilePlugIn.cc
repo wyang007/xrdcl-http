@@ -4,6 +4,8 @@
 
 #include "HttpFilePlugIn.hh"
 
+#include <unistd.h>
+
 #include <cassert>
 
 #include "HttpPlugInUtil.hh"
@@ -42,6 +44,7 @@ HttpFilePlugIn::HttpFilePlugIn()
     : davix_context_(),
       davix_client_(&davix_context_),
       davix_fd_(nullptr),
+      curr_offset(0),
       is_open_(false),
       url_(),
       properties_(),
@@ -56,6 +59,16 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
   if (is_open_) {
     logger_->Error(kLogXrdClHttp, "URL %s already open", url.c_str());
     return XRootDStatus(stError, errInvalidOp);
+  }
+
+  avoid_pread_ = false;
+  if (getenv(HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV) != NULL) 
+      avoid_pread_ = true;
+  else {
+     XrdCl::URL::ParamsMap CGIs = XrdCl::URL(url).GetParams();
+     auto search = CGIs.find(HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI);
+     if (search != CGIs.end()) 
+         avoid_pread_ = true;
   }
 
   Davix::RequestParams params;
@@ -182,15 +195,30 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  // res = std::pair<int, XRootDStatus>
-  auto res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+  std::pair<int, XRootDStatus> res;
+  if (! avoid_pread_) {
+    res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+  }
+  else { 
+    offset_locker.lock();
+    if (offset == curr_offset) {
+      res = Posix::Read(davix_client_, davix_fd_, buffer, size);
+    }
+    else {
+      res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+    }
+  }
+
   if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not read URL: %s, error: %s",
                    url_.c_str(), res.second.ToStr().c_str());
+    if (avoid_pread_) offset_locker.unlock();
     return res.second;
   }
 
   int num_bytes_read = res.first;
+  curr_offset = offset + num_bytes_read;
+  if (avoid_pread_) offset_locker.unlock();
 
   logger_->Debug(kLogXrdClHttp, "Read %d bytes, at offset %d, from URL: %s",
                  num_bytes_read, offset, url_.c_str());

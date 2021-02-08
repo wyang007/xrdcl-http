@@ -149,13 +149,17 @@ XRootDStatus HttpFileSystemPlugIn::DirList(const std::string &path,
 XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,
                                         ResponseHandler *handler,
                                         uint16_t timeout) {
-  const auto full_path = url_.GetLocation() + path;
+  //const auto full_path = url_.GetLocation() + path;
+  const auto full_path = url_.GetProtocol() + "://" +
+                         url_.GetHostName() + ":" +
+                         std::to_string(url_.GetPort()) + "/" + path;
 
   logger_->Debug(kLogXrdClHttp,
                  "HttpFileSystemPlugIn::Stat - path = %s, timeout = %d",
                  full_path.c_str(), timeout);
 
   auto stat_info = new StatInfo();
+  //XRootDStatus status;
   auto status = Posix::Stat(davix_client_, full_path, timeout, stat_info);
 
   if (status.IsError()) {
