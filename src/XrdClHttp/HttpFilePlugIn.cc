@@ -61,7 +61,15 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     return XRootDStatus(stError, errInvalidOp);
   }
 
-  //sleep(3);
+  avoid_pread_ = false;
+  if (getenv(HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV) != NULL) 
+      avoid_pread_ = true;
+  else {
+     XrdCl::URL::ParamsMap CGIs = XrdCl::URL(url).GetParams();
+     auto search = CGIs.find(HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI);
+     if (search != CGIs.end()) 
+         avoid_pread_ = true;
+  }
 
   Davix::RequestParams params;
   if (timeout != 0) {
@@ -188,24 +196,29 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
   }
 
   std::pair<int, XRootDStatus> res;
-  offset_locker.lock();
-  if (offset == curr_offset) {
-    res = Posix::PRead(davix_client_, davix_fd_, buffer, size, -1);
-  }
-  else {
+  if (! avoid_pread_) {
     res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+  }
+  else { 
+    offset_locker.lock();
+    if (offset == curr_offset) {
+      res = Posix::Read(davix_client_, davix_fd_, buffer, size);
+    }
+    else {
+      res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+    }
   }
 
   if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not read URL: %s, error: %s",
                    url_.c_str(), res.second.ToStr().c_str());
-    offset_locker.unlock();
+    if (avoid_pread_) offset_locker.unlock();
     return res.second;
   }
 
   int num_bytes_read = res.first;
   curr_offset = offset + num_bytes_read;
-  offset_locker.unlock();
+  if (avoid_pread_) offset_locker.unlock();
 
   logger_->Debug(kLogXrdClHttp, "Read %d bytes, at offset %d, from URL: %s",
                  num_bytes_read, offset, url_.c_str());

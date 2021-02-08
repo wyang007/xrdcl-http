@@ -48,6 +48,10 @@ XrdCl::XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
 XrdCl::XRootDStatus Unlink(Davix::DavPosix& davix_client,
                            const std::string& url, uint16_t timeout);
 
+std::pair<int, XrdCl::XRootDStatus> Read(Davix::DavPosix& davix_client,
+                                         DAVIX_FD* fd, void* buffer,
+                                         uint32_t size);
+
 std::pair<int, XrdCl::XRootDStatus> PRead(Davix::DavPosix& davix_client,
                                           DAVIX_FD* fd, void* buffer,
                                           uint32_t size, uint64_t offset);

@@ -335,17 +335,18 @@ XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
   return XRootDStatus();
 }
 
-std::pair<int, XRootDStatus> PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
-                                   void* buffer, uint32_t size,
-                                   uint64_t offset) {
+std::pair<int, XRootDStatus> _PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
+                                    void* buffer, uint32_t size,
+                                    uint64_t offset, bool no_pread = false) {
   Davix::DavixError* err = nullptr;
   int num_bytes_read;
-  printf("Posix::(P)Read(size=%d, offset=%ld)\n", size, offset);
-  if (offset != -1) {
-    num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
-  }
-  else { // continue reading from the current offset position
+  if (no_pread) { // continue reading from the current offset position
+    printf("Posix::Read(size=%d)\n", size);
     num_bytes_read = davix_client.read(fd, buffer, size, &err); 
+  }
+  else {
+    printf("Posix::PRead(size=%d, offset=%ld)\n", size, offset);
+    num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
   }
   if (num_bytes_read < 0) {
     auto errStatus =
@@ -355,6 +356,16 @@ std::pair<int, XRootDStatus> PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
   }
 
   return std::make_pair(num_bytes_read, XRootDStatus());
+}
+
+std::pair<int, XRootDStatus> Read(Davix::DavPosix& davix_client, DAVIX_FD* fd,
+                                  void* buffer, uint32_t size) {
+  return _PRead(davix_client, fd, buffer, size, 0, true);
+}
+
+std::pair<int, XRootDStatus> PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
+                                   void* buffer, uint32_t size, uint64_t offset) {
+  return _PRead(davix_client, fd, buffer, size, offset, false);
 }
 
 std::pair<int, XrdCl::XRootDStatus> PReadVec(Davix::DavPosix& davix_client,

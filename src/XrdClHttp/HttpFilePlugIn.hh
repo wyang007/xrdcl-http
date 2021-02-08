@@ -16,6 +16,16 @@
 #include <mutex>
 #include <unordered_map>
 
+// Indicate desire to avoid http "Range: bytes=234-567" header
+// Some HTTP(s) data source does not honor Range request, and always start from i
+// offset 0 when encounter a Range request, for example:
+// https://portal.nersc.gov/archive/home/projects/incite11/www/20C_Reanalysis_version_3/everymember_anal_netcdf/daily/WSPD10m/WSPD10m_1808_daily.tar
+//
+// 1. via Unix env via: this is global, avoid http ranger for all URLs
+#define HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV "XRDCLHTTP_AVOIDRANAGE"
+// 2. via CGI in URl, this only affect the associated URL
+#define HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI "xrddclhttp_avoidrange"
+
 namespace XrdCl {
 
 class Log;
@@ -105,6 +115,8 @@ class HttpFilePlugIn : public FilePlugIn {
 
   std::mutex offset_locker;
   uint64_t curr_offset;
+
+  bool avoid_pread_;
 
   bool is_open_;
 
