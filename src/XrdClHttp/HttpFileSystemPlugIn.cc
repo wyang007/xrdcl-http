@@ -159,8 +159,8 @@ XRootDStatus HttpFileSystemPlugIn::Stat(const std::string &path,
                  full_path.c_str(), timeout);
 
   auto stat_info = new StatInfo();
-  XRootDStatus status;
-  //auto status = Posix::Stat(davix_client_, full_path, timeout, stat_info);
+  //XRootDStatus status;
+  auto status = Posix::Stat(davix_client_, full_path, timeout, stat_info);
 
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());
