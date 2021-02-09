@@ -67,6 +67,15 @@ class HttpFilePlugIn : public FilePlugIn {
                              uint16_t         timeout ) override;
 
   //------------------------------------------------------------------------
+  //! @see XrdCl::File::PgRead - async
+  //------------------------------------------------------------------------
+  virtual XRootDStatus PgRead( uint64_t         offset,
+                               uint32_t         size,
+                               void            *buffer,
+                               ResponseHandler *handler,
+                               uint16_t         timeout ) override;
+
+  //------------------------------------------------------------------------
   //! @see XrdCl::File::Write
   //------------------------------------------------------------------------
   virtual XRootDStatus Write( uint64_t         offset,
@@ -117,6 +126,7 @@ class HttpFilePlugIn : public FilePlugIn {
   uint64_t curr_offset;
 
   bool avoid_pread_;
+  bool isChannelEncrypted;
 
   bool is_open_;
 

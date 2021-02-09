@@ -14,6 +14,8 @@
 #include "XrdCl/XrdClLog.hh"
 #include "XrdCl/XrdClStatus.hh"
 
+#include "XrdOuc/XrdOucCRC.hh"
+
 namespace {
 
 int MakePosixOpenFlags(XrdCl::OpenFlags::Flags flags) {
@@ -61,14 +63,19 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     return XRootDStatus(stError, errInvalidOp);
   }
 
+  if (XrdCl::URL(url).GetProtocol().find("https") == 0) 
+    isChannelEncrypted = true;
+  else
+    isChannelEncrypted = false; 
+
   avoid_pread_ = false;
   if (getenv(HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV) != NULL) 
-      avoid_pread_ = true;
+    avoid_pread_ = true;
   else {
-     XrdCl::URL::ParamsMap CGIs = XrdCl::URL(url).GetParams();
-     auto search = CGIs.find(HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI);
-     if (search != CGIs.end()) 
-         avoid_pread_ = true;
+    XrdCl::URL::ParamsMap CGIs = XrdCl::URL(url).GetParams();
+    auto search = CGIs.find(HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI);
+    if (search != CGIs.end()) 
+      avoid_pread_ = true;
   }
 
   Davix::RequestParams params;
@@ -230,6 +237,71 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
   handler->HandleResponse(status, obj);
 
   return XRootDStatus();
+}
+
+class PgReadSubstitutionHandler : public XrdCl::ResponseHandler {
+  private:
+    XrdCl::ResponseHandler *realHandler;
+    bool isChannelEncrypted;
+  public:
+  // constructor
+  PgReadSubstitutionHandler(XrdCl::ResponseHandler *a, 
+                            bool isHttps) : realHandler(a), isChannelEncrypted(isHttps) {}
+
+  // Response Handler
+  void HandleResponse(XrdCl::XRootDStatus *status,
+                      XrdCl::AnyObject    *rdresp) {
+
+    if( !status->IsOK() )
+    { 
+      realHandler->HandleResponse( status, rdresp );
+      delete this;
+      return;
+    }
+
+    //using namespace XrdCl;
+
+    ChunkInfo *chunk = 0;
+    rdresp->Get(chunk);
+
+    std::vector<uint32_t> cksums;
+    if( isChannelEncrypted )
+    {
+      size_t nbpages = chunk->length / XrdSys::PageSize;
+      if( chunk->length % XrdSys::PageSize )
+        ++nbpages;
+      cksums.reserve( nbpages );
+
+      size_t  size = chunk->length;
+      char   *buffer = reinterpret_cast<char*>( chunk->buffer );
+
+      for( size_t pg = 0; pg < nbpages; ++pg )
+      {
+        size_t pgsize = XrdSys::PageSize;
+        if( pgsize > size ) pgsize = size;
+        uint32_t crcval = XrdOucCRC::Calc32C( buffer, pgsize );
+        cksums.push_back( crcval );
+        buffer += pgsize;
+        size   -= pgsize;
+      }
+    }
+
+    PageInfo *pages = new PageInfo(chunk->offset, chunk->length, chunk->buffer, std::move(cksums));
+    delete rdresp;
+    AnyObject *response = new AnyObject();
+    response->Set( pages );
+    realHandler->HandleResponse( status, response );
+
+    delete this;
+  }
+};
+
+XRootDStatus HttpFilePlugIn::PgRead(uint64_t offset, uint32_t size, void *buffer,
+                                    ResponseHandler *handler,
+                                    uint16_t timeout) {
+  ResponseHandler *substitHandler = new PgReadSubstitutionHandler( handler, isChannelEncrypted );
+  XRootDStatus st = Read(offset, size, buffer, substitHandler, timeout);
+  return st;
 }
 
 XRootDStatus HttpFilePlugIn::Write(uint64_t offset, uint32_t size,
