@@ -341,11 +341,11 @@ std::pair<int, XRootDStatus> _PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
   Davix::DavixError* err = nullptr;
   int num_bytes_read;
   if (no_pread) { // continue reading from the current offset position
-    printf("Posix::Read(size=%d)\n", size);
+    printf("Posix::Read(size=%u)\n", size);
     num_bytes_read = davix_client.read(fd, buffer, size, &err); 
   }
   else {
-    printf("Posix::PRead(size=%d, offset=%ld)\n", size, offset);
+    printf("Posix::PRead(size=%u, offset=%llu)\n", size, (unsigned long long)offset);
     num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
   }
   if (num_bytes_read < 0) {
