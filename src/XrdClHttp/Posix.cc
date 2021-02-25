@@ -135,9 +135,6 @@ std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
   SetTimeout(params, timeout);
   SetX509(params);
   Davix::DavixError* err = nullptr;
-
-  printf("Posix::Open(%s)\n", url.c_str());
-
   DAVIX_FD* fd = davix_client.open(&params, url, flags, &err);
   auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
                                    err->getErrMsg())
@@ -299,8 +296,6 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
   SetTimeout(params, timeout);
   SetX509(params);
 
-  printf("Posix::Stat(%s)\n", url.c_str());
-
   struct stat stats;
   Davix::DavixError* err = nullptr;
   if (davix_client.stat(&params, url, &stats, &err)) {
@@ -341,11 +336,9 @@ std::pair<int, XRootDStatus> _PRead(Davix::DavPosix& davix_client, DAVIX_FD* fd,
   Davix::DavixError* err = nullptr;
   int num_bytes_read;
   if (no_pread) { // continue reading from the current offset position
-    printf("Posix::Read(size=%u)\n", size);
     num_bytes_read = davix_client.read(fd, buffer, size, &err); 
   }
   else {
-    printf("Posix::PRead(size=%u, offset=%llu)\n", size, (unsigned long long)offset);
     num_bytes_read = davix_client.pread(fd, buffer, size, offset, &err);
   }
   if (num_bytes_read < 0) {
