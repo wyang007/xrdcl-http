@@ -22,9 +22,9 @@
 // https://portal.nersc.gov/archive/home/projects/incite11/www/20C_Reanalysis_version_3/everymember_anal_netcdf/daily/WSPD10m/WSPD10m_1808_daily.tar
 //
 // 1. via Unix env via: this is global, avoid http ranger for all URLs
-#define HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV "XRDCLHTTP_AVOIDRANAGE"
+#define HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV "XRDCLHTTP_AVOIDRANGE"
 // 2. via CGI in URl, this only affect the associated URL
-#define HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI "xrddclhttp_avoidrange"
+#define HTTP_FILE_PLUG_IN_AVOIDRANGE_CGI "xrdclhttp_avoidrange"
 
 namespace XrdCl {
 
