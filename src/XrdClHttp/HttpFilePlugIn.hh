@@ -33,7 +33,7 @@ class Log;
 class HttpFilePlugIn : public FilePlugIn {
  public:
   HttpFilePlugIn();
-  virtual ~HttpFilePlugIn() noexcept = default;
+  virtual ~HttpFilePlugIn() noexcept;
 
   //------------------------------------------------------------------------
   //! @see XrdCl::File::Open
@@ -117,8 +117,8 @@ class HttpFilePlugIn : public FilePlugIn {
 
  private:
 
-  Davix::Context davix_context_;
-  Davix::DavPosix davix_client_;
+  Davix::Context *davix_context_;
+  Davix::DavPosix *davix_client_;
 
   DAVIX_FD* davix_fd_;
 

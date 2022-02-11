@@ -42,10 +42,11 @@ int MakePosixOpenFlags(XrdCl::OpenFlags::Flags flags) {
 
 namespace XrdCl {
 
+Davix::Context *root_davix_context_ = NULL;
+Davix::DavPosix *root_davix_client_file_ = NULL;
+
 HttpFilePlugIn::HttpFilePlugIn()
-    : davix_context_(),
-      davix_client_(&davix_context_),
-      davix_fd_(nullptr),
+    : davix_fd_(nullptr),
       curr_offset(0),
       is_open_(false),
       url_(),
@@ -53,6 +54,28 @@ HttpFilePlugIn::HttpFilePlugIn()
       logger_(DefaultEnv::GetLog()) {
   SetUpLogging(logger_);
   logger_->Debug(kLogXrdClHttp, "HttpFilePlugin constructed.");
+
+  std::string origin = getenv("XRDXROOTD_PROXY");
+  if (origin.find("=") == 0) {
+      davix_context_ = new Davix::Context();
+      davix_client_ = new Davix::DavPosix(davix_context_);
+  }
+  else {
+      if (root_davix_context_ == NULL) {
+          root_davix_context_ = new Davix::Context();
+          root_davix_client_file_ = new Davix::DavPosix(root_davix_context_);
+      }
+      davix_context_ = root_davix_context_;
+      davix_client_ = root_davix_client_file_;
+  }
+
+}
+
+HttpFilePlugIn::~HttpFilePlugIn() noexcept {
+    if (root_davix_context_ == NULL) {
+        delete davix_client_;
+        delete davix_context_;
+    }
 }
 
 XRootDStatus HttpFilePlugIn::Open(const std::string &url,
@@ -90,7 +113,7 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
     auto base_dir =
         pos != std::string::npos ? full_path.substr(0, pos) : full_path;
     auto mkdir_status =
-        Posix::MkDir(davix_client_, base_dir, XrdCl::MkDirFlags::MakePath,
+        Posix::MkDir(*davix_client_, base_dir, XrdCl::MkDirFlags::MakePath,
                     XrdCl::Access::None, timeout);
     if (mkdir_status.IsError()) {
       logger_->Error(kLogXrdClHttp,
@@ -103,9 +126,9 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
   if (((flags & OpenFlags::Write) || (flags & OpenFlags::Update)) &&
       (flags & OpenFlags::Delete)) {
     auto stat_info = new StatInfo();
-    auto status = Posix::Stat(davix_client_, url, timeout, stat_info);
+    auto status = Posix::Stat(*davix_client_, url, timeout, stat_info);
     if (status.IsOK()) {
-      auto unlink_status = Posix::Unlink(davix_client_, url, timeout);
+      auto unlink_status = Posix::Unlink(*davix_client_, url, timeout);
       if (unlink_status.IsError()) {
         logger_->Error(
             kLogXrdClHttp,
@@ -123,7 +146,7 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
                  url.c_str(), flags, posix_open_flags);
 
   // res == std::pair<fd, XRootDStatus>
-  auto res = Posix::Open(davix_client_, url, posix_open_flags, timeout);
+  auto res = Posix::Open(*davix_client_, url, posix_open_flags, timeout);
   if (!res.first) {
     logger_->Error(kLogXrdClHttp, "Could not open: %s, error: %s", url.c_str(),
                    res.second.ToStr().c_str());
@@ -153,7 +176,7 @@ XRootDStatus HttpFilePlugIn::Close(ResponseHandler *handler,
 
   logger_->Debug(kLogXrdClHttp, "Closing davix fd: %ld", davix_fd_);
 
-  auto status = Posix::Close(davix_client_, davix_fd_);
+  auto status = Posix::Close(*davix_client_, davix_fd_);
   if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not close davix fd: %ld, error: %s",
                    davix_fd_, status.ToStr().c_str());
@@ -177,8 +200,16 @@ XRootDStatus HttpFilePlugIn::Stat(bool /*force*/, ResponseHandler *handler,
   }
 
   auto stat_info = new StatInfo();
-  auto status = Posix::Stat(davix_client_, url_, timeout, stat_info);
-  if (status.IsError()) {
+  auto status = Posix::Stat(*davix_client_, url_, timeout, stat_info);
+  // A file that is_open_ = true should not retune 400/3011. the only time this
+  // happen is a newly created file. Davix doesn't issue a http PUT so this file
+  // won't show up for Stat(). Here we fake a response.
+  if (status.IsError() && status.code == 400 && status.errNo == 3011) {
+    std::ostringstream data;
+    data << 140737018595560 << " " << 0 << " " << 33261 << " " << time(NULL);
+    stat_info->ParseServerResponse(data.str().c_str());
+  }
+  else if (status.IsError()) {
     logger_->Error(kLogXrdClHttp, "Stat failed: %s", status.ToStr().c_str());
     return status;
   }
@@ -204,15 +235,15 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
 
   std::pair<int, XRootDStatus> res;
   if (! avoid_pread_) {
-    res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+    res = Posix::PRead(*davix_client_, davix_fd_, buffer, size, offset);
   }
   else { 
     offset_locker.lock();
     if (offset == curr_offset) {
-      res = Posix::Read(davix_client_, davix_fd_, buffer, size);
+      res = Posix::Read(*davix_client_, davix_fd_, buffer, size);
     }
     else {
-      res = Posix::PRead(davix_client_, davix_fd_, buffer, size, offset);
+      res = Posix::PRead(*davix_client_, davix_fd_, buffer, size, offset);
     }
   }
 
@@ -315,7 +346,7 @@ XRootDStatus HttpFilePlugIn::Write(uint64_t offset, uint32_t size,
 
   // res == std::pair<int, XRootDStatus>
   auto res =
-      Posix::PWrite(davix_client_, davix_fd_, offset, size, buffer, timeout);
+      Posix::PWrite(*davix_client_, davix_fd_, offset, size, buffer, timeout);
   if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not write URL: %s, error: %s",
                    url_.c_str(), res.second.ToStr().c_str());
@@ -359,7 +390,7 @@ XRootDStatus HttpFilePlugIn::VectorRead(const ChunkList &chunks, void *buffer,
   }
 
   // res == std::pair<int, XRootDStatus>
-  auto res = Posix::PReadVec(davix_client_, davix_fd_, chunks, buffer);
+  auto res = Posix::PReadVec(*davix_client_, davix_fd_, chunks, buffer);
   if (res.second.IsError()) {
     logger_->Error(kLogXrdClHttp, "Could not vectorRead URL: %s, error: %s",
                    url_.c_str(), res.second.ToStr().c_str());

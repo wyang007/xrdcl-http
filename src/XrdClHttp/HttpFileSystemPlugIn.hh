@@ -18,7 +18,7 @@ class Log;
 class HttpFileSystemPlugIn : public FileSystemPlugIn {
  public:
   HttpFileSystemPlugIn(const std::string &url);
-  virtual ~HttpFileSystemPlugIn() noexcept = default;
+  virtual ~HttpFileSystemPlugIn() noexcept;
 
   virtual XRootDStatus Mv(const std::string &source, const std::string &dest,
                           ResponseHandler *handler, uint16_t timeout) override;
@@ -48,8 +48,8 @@ class HttpFileSystemPlugIn : public FileSystemPlugIn {
                            std::string &value) const override;
 
  private:
-  Davix::Context ctx_;
-  Davix::DavPosix davix_client_;
+  Davix::Context *ctx_;
+  Davix::DavPosix *davix_client_;
 
   URL url_;
 
