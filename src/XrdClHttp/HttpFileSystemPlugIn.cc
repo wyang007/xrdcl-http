@@ -27,8 +27,8 @@ HttpFileSystemPlugIn::HttpFileSystemPlugIn(const std::string &url)
   logger_->Debug(kLogXrdClHttp,
                  "HttpFileSystemPlugIn constructed with URL: %s.",
                  url_.GetURL().c_str());
-  std::string origin = getenv("XRDXROOTD_PROXY");
-  if (origin.find("=") == 0) {
+  std::string origin = getenv("XRDXROOTD_PROXY")? getenv("XRDXROOTD_PROXY") : "";
+  if ( origin.empty() || origin.find("=") == 0) {
       ctx_ = new Davix::Context();
       davix_client_ = new Davix::DavPosix(ctx_);
   }

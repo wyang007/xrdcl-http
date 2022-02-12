@@ -55,8 +55,8 @@ HttpFilePlugIn::HttpFilePlugIn()
   SetUpLogging(logger_);
   logger_->Debug(kLogXrdClHttp, "HttpFilePlugin constructed.");
 
-  std::string origin = getenv("XRDXROOTD_PROXY");
-  if (origin.find("=") == 0) {
+  std::string origin = getenv("XRDXROOTD_PROXY")? getenv("XRDXROOTD_PROXY") : "";
+  if ( origin.empty() || origin.find("=") == 0) {
       davix_context_ = new Davix::Context();
       davix_client_ = new Davix::DavPosix(davix_context_);
   }
