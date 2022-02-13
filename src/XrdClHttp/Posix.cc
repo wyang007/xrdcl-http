@@ -146,10 +146,14 @@ std::string SanitizedURL(const std::string& url) {
   XrdCl::URL xurl(url);
   std::string path = xurl.GetPath();
   if (path.find("/") != 0) path = "/" + path;
-  return xurl.GetProtocol() + "://" 
-       + xurl.GetHostName() + ":"
-       + std::to_string(xurl.GetPort())
-       + path;
+  std::string returl = xurl.GetProtocol() + "://" 
+                     + xurl.GetHostName() + ":"
+                     + std::to_string(xurl.GetPort())
+                     + path;
+  if (! xurl.GetParamsAsString().empty()) {
+    returl = returl + xurl.GetParamsAsString();
+  }
+  return returl;
 }
 
 std::pair<uint16_t, XErrorCode> ErrCodeConvert(Davix::StatusCode::Code code) {
