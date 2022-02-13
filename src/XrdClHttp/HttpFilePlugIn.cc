@@ -49,6 +49,7 @@ HttpFilePlugIn::HttpFilePlugIn()
     : davix_fd_(nullptr),
       curr_offset(0),
       is_open_(false),
+      filesize(0),
       url_(),
       properties_(),
       logger_(DefaultEnv::GetLog()) {
@@ -137,6 +138,15 @@ XRootDStatus HttpFilePlugIn::Open(const std::string &url,
         return unlink_status;
       }
     }
+    delete stat_info;
+  }
+  else if (flags & OpenFlags::Read) {
+    auto stat_info = new StatInfo();
+    auto status = Posix::Stat(*davix_client_, url, timeout, stat_info);
+    if (status.IsOK()) {
+      filesize = stat_info->GetSize();
+    }
+    delete stat_info;
   }
 
   auto posix_open_flags = MakePosixOpenFlags(flags);
@@ -206,7 +216,7 @@ XRootDStatus HttpFilePlugIn::Stat(bool /*force*/, ResponseHandler *handler,
   // won't show up for Stat(). Here we fake a response.
   if (status.IsError() && status.code == 400 && status.errNo == 3011) {
     std::ostringstream data;
-    data << 140737018595560 << " " << 0 << " " << 33261 << " " << time(NULL);
+    data << 140737018595560 << " " << filesize << " " << 33261 << " " << time(NULL);
     stat_info->ParseServerResponse(data.str().c_str());
   }
   else if (status.IsError()) {
@@ -233,6 +243,8 @@ XRootDStatus HttpFilePlugIn::Read(uint64_t offset, uint32_t size, void *buffer,
     return XRootDStatus(stError, errInvalidOp);
   }
 
+  // DavPosix::pread will return -1 if the pread goes beyond the file size
+  size = (offset + size > filesize)? filesize - offset : size;
   std::pair<int, XRootDStatus> res;
   if (! avoid_pread_) {
     res = Posix::PRead(*davix_client_, davix_fd_, buffer, size, offset);
@@ -352,6 +364,8 @@ XRootDStatus HttpFilePlugIn::Write(uint64_t offset, uint32_t size,
                    url_.c_str(), res.second.ToStr().c_str());
     return res.second;
   }
+  else
+    filesize += res.first;
 
   logger_->Debug(kLogXrdClHttp, "Wrote %d bytes, at offset %d, to URL: %s",
                  res.first, offset, url_.c_str());

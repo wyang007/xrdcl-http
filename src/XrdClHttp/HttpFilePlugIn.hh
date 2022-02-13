@@ -20,7 +20,6 @@
 // Some HTTP(s) data source does not honor Range request, and always start from
 // offset 0 when encounter a Range request, for example:
 // https://portal.nersc.gov/archive/home/projects/incite11/www/20C_Reanalysis_version_3/everymember_anal_netcdf/daily/WSPD10m/WSPD10m_1808_daily.tar
-// Xrootd based HTTP server seems to be another example
 //
 // 1. via Unix env via: this is global, avoid http ranger for all URLs
 #define HTTP_FILE_PLUG_IN_AVOIDRANGE_ENV "XRDCLHTTP_AVOIDRANGE"
@@ -130,6 +129,7 @@ class HttpFilePlugIn : public FilePlugIn {
   bool isChannelEncrypted;
 
   bool is_open_;
+  uint64_t filesize;
 
   std::string url_;
 
