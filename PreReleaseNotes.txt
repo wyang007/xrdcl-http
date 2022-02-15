@@ -7,11 +7,13 @@ Prerelease Notes
 
 + **New Features**
   7736fdb: support s3 backend via AWS keys.
+  45bddc4: set AWS signature v4 as the default; disable Rename() for s3
 
 + **Major bug fixes**
   7736fdb: fix errno propagation issue in the destructor of HttpFileSystemPlugIn.
   52f5f85: prevent DavPosix::pread() from reading beyond the actual size of a file.
 
 + **Minor bug fixes**
+  52f5f85: add CGI back to the sanitized url for DavPosix::open
 
 + **Miscellaneous**
