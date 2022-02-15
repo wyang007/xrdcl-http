@@ -125,14 +125,18 @@ void SetX509(Davix::RequestParams& params) {
 }
 
 void SetAuthS3(Davix::RequestParams& params) {
-  //Davix::setLogScope(DAVIX_LOG_S3);
   //Davix::setLogScope(DAVIX_LOG_SCOPE_ALL);
-  //Davix::setLogScope(DAVIX_LOG_HEADER);
+  //Davix::setLogScope(DAVIX_LOG_HEADER | DAVIX_LOG_S3);
   //Davix::setLogLevel(DAVIX_LOG_TRACE);
   params.setProtocol(Davix::RequestProtocol::AwsS3);
   params.setAwsAuthorizationKeys(getenv("AWS_SECRET_ACCESS_KEY"),
                                  getenv("AWS_ACCESS_KEY_ID"));
   params.setAwsAlternate(true);
+  // if AWS region is not set, Davix will use the old AWS signature v2
+  if (getenv("AWS_REGION")) 
+     params.setAwsRegion(getenv("AWS_REGION"));
+  else if (! getenv("AWS_SIGNATURE_V2"))
+     params.setAwsRegion("mars");
 }
 
 void SetAuthz(Davix::RequestParams& params) {
@@ -156,9 +160,13 @@ std::string SanitizedURL(const std::string& url) {
   return returl;
 }
 
+// check davix/include/davix/status/davixstatusrequest.hpp and
+// XProtocol/XProtocol.hh (XErrorCode) for corresponding error codes.
 std::pair<uint16_t, XErrorCode> ErrCodeConvert(Davix::StatusCode::Code code) {
   if (code == Davix::StatusCode::FileNotFound)
     return std::make_pair(XrdCl::errErrorResponse, kXR_NotFound);
+  else if (code == Davix::StatusCode::FileExist)
+    return std::make_pair(XrdCl::errErrorResponse, kXR_ItExists);
   else
     return std::make_pair(XrdCl::errErrorResponse, kXR_InvalidRequest);  
 }
@@ -177,9 +185,15 @@ std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
   SetAuthz(params);
   Davix::DavixError* err = nullptr;
   DAVIX_FD* fd = davix_client.open(&params, SanitizedURL(url), flags, &err);
-  auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
-                                   err->getErrMsg())
-                    : XRootDStatus();
+  XRootDStatus status;
+  if (!fd) {
+    auto res = ErrCodeConvert(err->getStatus());
+    status = XRootDStatus(stError, res.first, res.second, err->getErrMsg());
+    delete err;
+  }
+  else {
+    status = XRootDStatus();
+  }
   return std::make_pair(fd, status);
 }
 
@@ -319,6 +333,14 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
 
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout) {
+
+  // most s3 storage systems either:
+  // 1. do not support rename, especially for files that were uploaded using multi-part
+  // 2. support by copy-n-delete.
+  // we could implement copy-n-delete if necessary
+  if (getenv("AWS_ACCESS_KEY_ID"))
+      return XRootDStatus(stError, errErrorResponse, kXR_Unsupported);
+
   Davix::RequestParams params;
   SetTimeout(params, timeout);
   SetAuthz(params);
