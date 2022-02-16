@@ -154,7 +154,10 @@ std::string SanitizedURL(const std::string& url) {
                      + xurl.GetHostName() + ":"
                      + std::to_string(xurl.GetPort())
                      + path;
-  if (! xurl.GetParamsAsString().empty()) {
+  // for s3 storage using AWS_ACCESS_KEY_ID, filter out all CGIs
+  // Known issues:
+  // Google cloud storage does not like ?xrd.gsiusrpxy=/tmp/..., Will fail Stat()
+  if (! getenv("AWS_ACCESS_KEY_ID") && ! xurl.GetParamsAsString().empty()) {
     returl = returl + xurl.GetParamsAsString();
   }
   return returl;
@@ -167,6 +170,8 @@ std::pair<uint16_t, XErrorCode> ErrCodeConvert(Davix::StatusCode::Code code) {
     return std::make_pair(XrdCl::errErrorResponse, kXR_NotFound);
   else if (code == Davix::StatusCode::FileExist)
     return std::make_pair(XrdCl::errErrorResponse, kXR_ItExists);
+  else if (code == Davix::StatusCode::PermissionRefused)
+    return std::make_pair(XrdCl::errErrorResponse, kXR_NotAuthorized);
   else
     return std::make_pair(XrdCl::errErrorResponse, kXR_InvalidRequest);  
 }
