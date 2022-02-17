@@ -8,6 +8,7 @@
 
 #include "Posix.hh"
 
+#include "XProtocol/XProtocol.hh"
 #include "XrdCl/XrdClStatus.hh"
 #include "XrdCl/XrdClXRootDResponses.hh"
 #include "XrdCl/XrdClURL.hh"
@@ -57,6 +58,7 @@ void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
   ts.tv_sec = 30;
   params.setConnectionTimeout(&ts);
 
+  params.setOperationRetry(0);
   params.setOperationRetryDelay(2);
 }
 
@@ -122,6 +124,58 @@ void SetX509(Davix::RequestParams& params) {
     params.addCertificateAuthorityPath("/etc/grid-security/certificates");      
 }
 
+void SetAuthS3(Davix::RequestParams& params) {
+  //Davix::setLogScope(DAVIX_LOG_SCOPE_ALL);
+  //Davix::setLogScope(DAVIX_LOG_HEADER | DAVIX_LOG_S3);
+  //Davix::setLogLevel(DAVIX_LOG_TRACE);
+  params.setProtocol(Davix::RequestProtocol::AwsS3);
+  params.setAwsAuthorizationKeys(getenv("AWS_SECRET_ACCESS_KEY"),
+                                 getenv("AWS_ACCESS_KEY_ID"));
+  params.setAwsAlternate(true);
+  // if AWS region is not set, Davix will use the old AWS signature v2
+  if (getenv("AWS_REGION")) 
+     params.setAwsRegion(getenv("AWS_REGION"));
+  else if (! getenv("AWS_SIGNATURE_V2"))
+     params.setAwsRegion("mars");
+}
+
+void SetAuthz(Davix::RequestParams& params) {
+  if (getenv("AWS_ACCESS_KEY_ID") && getenv("AWS_SECRET_ACCESS_KEY"))
+    SetAuthS3(params);
+  else
+    SetX509(params);
+}
+
+std::string SanitizedURL(const std::string& url) {
+  XrdCl::URL xurl(url);
+  std::string path = xurl.GetPath();
+  if (path.find("/") != 0) path = "/" + path;
+  std::string returl = xurl.GetProtocol() + "://" 
+                     + xurl.GetHostName() + ":"
+                     + std::to_string(xurl.GetPort())
+                     + path;
+  // for s3 storage using AWS_ACCESS_KEY_ID, filter out all CGIs
+  // Known issues:
+  // Google cloud storage does not like ?xrd.gsiusrpxy=/tmp/..., Will fail Stat()
+  if (! getenv("AWS_ACCESS_KEY_ID") && ! xurl.GetParamsAsString().empty()) {
+    returl = returl + xurl.GetParamsAsString();
+  }
+  return returl;
+}
+
+// check davix/include/davix/status/davixstatusrequest.hpp and
+// XProtocol/XProtocol.hh (XErrorCode) for corresponding error codes.
+std::pair<uint16_t, XErrorCode> ErrCodeConvert(Davix::StatusCode::Code code) {
+  if (code == Davix::StatusCode::FileNotFound)
+    return std::make_pair(XrdCl::errErrorResponse, kXR_NotFound);
+  else if (code == Davix::StatusCode::FileExist)
+    return std::make_pair(XrdCl::errErrorResponse, kXR_ItExists);
+  else if (code == Davix::StatusCode::PermissionRefused)
+    return std::make_pair(XrdCl::errErrorResponse, kXR_NotAuthorized);
+  else
+    return std::make_pair(XrdCl::errErrorResponse, kXR_InvalidRequest);  
+}
+
 }  // namespace
 
 namespace Posix {
@@ -133,12 +187,18 @@ std::pair<DAVIX_FD*, XRootDStatus> Open(Davix::DavPosix& davix_client,
                                         uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
   Davix::DavixError* err = nullptr;
-  DAVIX_FD* fd = davix_client.open(&params, url, flags, &err);
-  auto status = !fd ? XRootDStatus(stError, errInternal, err->getStatus(),
-                                   err->getErrMsg())
-                    : XRootDStatus();
+  DAVIX_FD* fd = davix_client.open(&params, SanitizedURL(url), flags, &err);
+  XRootDStatus status;
+  if (!fd) {
+    auto res = ErrCodeConvert(err->getStatus());
+    status = XRootDStatus(stError, res.first, res.second, err->getErrMsg());
+    delete err;
+  }
+  else {
+    status = XRootDStatus();
+  }
   return std::make_pair(fd, status);
 }
 
@@ -157,13 +217,16 @@ XRootDStatus Close(Davix::DavPosix& davix_client, DAVIX_FD* fd) {
 XRootDStatus MkDir(Davix::DavPosix& davix_client, const std::string& path,
                    XrdCl::MkDirFlags::Flags flags, XrdCl::Access::Mode /*mode*/,
                    uint16_t timeout) {
+
+  return XRootDStatus();
+
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   auto DoMkDir = [&davix_client, &params](const std::string& path) {
     Davix::DavixError* err = nullptr;
-    if (davix_client.mkdir(&params, path, S_IRWXU, &err) &&
+    if (davix_client.mkdir(&params, SanitizedURL(path), S_IRWXU, &err) &&
         (err->getStatus() != Davix::StatusCode::FileExist)) {
       auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
                                     err->getErrMsg());
@@ -205,7 +268,7 @@ XRootDStatus RmDir(Davix::DavPosix& davix_client, const std::string& path,
                    uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   Davix::DavixError* err = nullptr;
   if (davix_client.rmdir(&params, path, &err)) {
@@ -223,7 +286,7 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
     bool /*recursive*/, uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   auto dir_list = new DirectoryList();
 
@@ -275,12 +338,20 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
 
 XRootDStatus Rename(Davix::DavPosix& davix_client, const std::string& source,
                     const std::string& dest, uint16_t timeout) {
+
+  // most s3 storage systems either:
+  // 1. do not support rename, especially for files that were uploaded using multi-part
+  // 2. support by copy-n-delete.
+  // we could implement copy-n-delete if necessary
+  if (getenv("AWS_ACCESS_KEY_ID"))
+      return XRootDStatus(stError, errErrorResponse, kXR_Unsupported);
+
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   Davix::DavixError* err = nullptr;
-  if (davix_client.rename(&params, source, dest, &err)) {
+  if (davix_client.rename(&params, SanitizedURL(source), SanitizedURL(dest), &err)) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
@@ -294,13 +365,14 @@ XRootDStatus Stat(Davix::DavPosix& davix_client, const std::string& url,
                   uint16_t timeout, StatInfo* stat_info) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   struct stat stats;
   Davix::DavixError* err = nullptr;
-  if (davix_client.stat(&params, url, &stats, &err)) {
+  if (davix_client.stat(&params, SanitizedURL(url), &stats, &err)) {
+    auto res = ErrCodeConvert(err->getStatus());
     auto errStatus =
-        XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
+        XRootDStatus(stError, res.first, res.second, err->getErrMsg());
     delete err;
     return errStatus;
   }
@@ -317,10 +389,10 @@ XRootDStatus Unlink(Davix::DavPosix& davix_client, const std::string& url,
                     uint16_t timeout) {
   Davix::RequestParams params;
   SetTimeout(params, timeout);
-  SetX509(params);
+  SetAuthz(params);
 
   Davix::DavixError* err = nullptr;
-  if (davix_client.unlink(&params, url, &err)) {
+  if (davix_client.unlink(&params, SanitizedURL(url), &err)) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
     delete err;
@@ -393,7 +465,7 @@ std::pair<int, XrdCl::XRootDStatus> PWrite(Davix::DavPosix& davix_client,
                                            uint32_t size, const void* buffer,
                                            uint16_t timeout) {
   Davix::DavixError* err = nullptr;
-  int new_offset = davix_client.lseek(fd, offset, SEEK_SET, &err);
+  off_t new_offset = davix_client.lseek(fd, offset, SEEK_SET, &err);
   if (uint64_t(new_offset) != offset) {
     auto errStatus =
         XRootDStatus(stError, errInternal, err->getStatus(), err->getErrMsg());
