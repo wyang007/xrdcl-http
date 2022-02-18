@@ -17,5 +17,6 @@ Prerelease Notes
   52f5f85: add CGI back to the sanitized url for DavPosix::open
   b760eba: Filter out CGI when AWS_ACCESS_KEY_ID is in use
   d23abd6: make dirlist working.
+  2fa3c66: minor update
 
 + **Miscellaneous**
