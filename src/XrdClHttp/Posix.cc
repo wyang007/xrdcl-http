@@ -71,8 +71,15 @@ XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat
          << " " << stats.st_mtime;
   }
   else {
-    data << stats.st_dev << " " << stats.st_size << " " 
-         << stats.st_mode << " " << stats.st_mtime;
+    if (getenv("AWS_ACCESS_KEY_ID")) {
+        data << stats.st_dev << " " << stats.st_size << " " 
+             << XrdCl::StatInfo::Flags::IsReadable << " " << stats.st_mtime;
+    }
+    else {
+        data << stats.st_dev << " " << stats.st_size << " " 
+             << stats.st_mode << " " << stats.st_mtime;
+    }
+
   }
 
   if (!stat_info->ParseServerResponse(data.str().c_str())) {
