@@ -64,8 +64,23 @@ void SetTimeout(Davix::RequestParams& params, uint16_t timeout) {
 
 XrdCl::XRootDStatus FillStatInfo(const struct stat& stats, XrdCl::StatInfo* stat_info) {
   std::ostringstream data;
-  data << stats.st_dev << " " << stats.st_size << " " << stats.st_mode << " "
-       << stats.st_mtime;
+  if (S_ISDIR(stats.st_mode)) {
+    data << stats.st_dev << " " << stats.st_size << " " 
+         << (XrdCl::StatInfo::Flags::IsDir | XrdCl::StatInfo::Flags::IsReadable | 
+             XrdCl::StatInfo::Flags::IsWritable | XrdCl::StatInfo::Flags::XBitSet)
+         << " " << stats.st_mtime;
+  }
+  else {
+    if (getenv("AWS_ACCESS_KEY_ID")) {
+        data << stats.st_dev << " " << stats.st_size << " " 
+             << XrdCl::StatInfo::Flags::IsReadable << " " << stats.st_mtime;
+    }
+    else {
+        data << stats.st_dev << " " << stats.st_size << " " 
+             << stats.st_mode << " " << stats.st_mtime;
+    }
+
+  }
 
   if (!stat_info->ParseServerResponse(data.str().c_str())) {
     return XrdCl::XRootDStatus(XrdCl::stError, XrdCl::errDataError);
@@ -292,7 +307,7 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
 
   Davix::DavixError* err = nullptr;
 
-  auto dir_fd = davix_client.opendirpp(&params, path, &err);
+  auto dir_fd = davix_client.opendirpp(&params, SanitizedURL(path), &err);
   if (!dir_fd) {
     auto errStatus = XRootDStatus(stError, errInternal, err->getStatus(),
                                   err->getErrMsg());
@@ -323,7 +338,9 @@ std::pair<XrdCl::DirectoryList*, XrdCl::XRootDStatus> DirList(
     auto list_entry = new DirectoryList::ListEntry(path, entry->d_name, stat_info);
     dir_list->Add(list_entry);
 
-    delete entry;
+    // do not delete "entry". davix_client.readdirpp() always return the same address
+    // and will set it to NULL when there is no more directory entry to return 
+    //delete entry;
   }
 
   if (davix_client.closedirpp(dir_fd, &err)) {
