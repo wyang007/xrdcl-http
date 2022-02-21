@@ -20,3 +20,4 @@ Prerelease Notes
   2fa3c66: minor update
 
 + **Miscellaneous**
+  50eddc7: add https to the client config file
